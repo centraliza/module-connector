@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="Centraliza\Connector\Core\Port\ClockInterface" type="Centraliza\Connector\Infra\Time\SystemClock"/>
+    <preference for="Centraliza\Connector\Core\Port\CircuitStoreInterface" type="Centraliza\Connector\Infra\Persistence\CircuitStore"/>
+    <preference for="Centraliza\Connector\Core\Port\RetryStoreInterface" type="Centraliza\Connector\Infra\Persistence\RetryStore"/>
+    <preference for="Centraliza\Connector\Core\Policy\DeliveryPolicyInterface" type="Centraliza\Connector\Core\Policy\ConnectionEventPolicy"/>
+    <preference for="Centraliza\Connector\Core\Port\ChangeRecorderInterface" type="Centraliza\Connector\Capture\Collector"/>
+    <preference for="Centraliza\Connector\Core\Port\EventPublisherInterface" type="Centraliza\Connector\Infra\Queue\GuardedPublisher"/>
+    <preference for="Centraliza\Connector\Core\Port\TransactionStateInterface" type="Centraliza\Connector\Infra\Db\TransactionState"/>
+    <preference for="Centraliza\Connector\Core\Port\SettingsInterface" type="Centraliza\Connector\Infra\Config\Settings"/>
+    <preference for="Centraliza\Connector\Core\Port\IdGeneratorInterface" type="Centraliza\Connector\Infra\Id\UuidGenerator"/>
+
+    <!-- The collector is built on the first commit of every request; the queue stack behind it only when there is something to publish. -->
+    <type name="Centraliza\Connector\Capture\Collector">
+        <arguments>
+            <argument name="publisher" xsi:type="object">Centraliza\Connector\Infra\Queue\GuardedPublisher\Proxy</argument>
+        </arguments>
+    </type>
+
+    <type name="Centraliza\Connector\Core\Stream\StreamRegistry">
+        <arguments>
+            <argument name="streams" xsi:type="array">
+            </argument>
+        </arguments>
+    </type>
+
+    <preference for="Centraliza\Connector\Core\Port\TransportInterface" type="Centraliza\Connector\Infra\Http\DryRunTransport"/>
+
+    <type name="Magento\Framework\DB\Adapter\AdapterInterface">
+        <plugin name="centraliza_connector_transaction_boundary" type="Centraliza\Connector\Capture\TransactionBoundaryPlugin"/>
+    </type>
+</config>

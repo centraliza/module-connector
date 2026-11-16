@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <centraliza_connector>
+            <general>
+                <enabled>0</enabled>
+                <mode>dry_run</mode>
+                <api_key backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
+                <connection_id/>
+                <base_url>https://api.centraliza.ai</base_url>
+            </general>
+        </centraliza_connector>
+    </default>
+</config>
