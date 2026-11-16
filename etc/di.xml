@@ -29,6 +29,13 @@
                         <item name="previous_sku" xsi:type="string">previous_sku</item>
                     </item>
                 </item>
+                <item name="stock" xsi:type="array">
+                    <item name="lane" xsi:type="string">realtime</item>
+                    <item name="key" xsi:type="array">
+                        <item name="sku" xsi:type="string">sku</item>
+                        <item name="source_code" xsi:type="string">source_code</item>
+                    </item>
+                </item>
             </argument>
         </arguments>
     </type>
@@ -38,8 +45,17 @@
     <type name="Magento\Catalog\Model\ResourceModel\Product\Action">
         <plugin name="centraliza_connector_record_mass_attribute_update" type="Centraliza\Connector\Entity\Product\Plugin\RecordMassAttributeUpdate"/>
     </type>
+    <type name="Magento\InventoryApi\Api\SourceItemsSaveInterface">
+        <plugin name="centraliza_connector_record_source_items_save" type="Centraliza\Connector\Entity\Stock\Plugin\RecordSourceItemsSave"/>
+    </type>
+    <type name="Magento\Inventory\Model\ResourceModel\SourceItem\DeleteMultiple">
+        <plugin name="centraliza_connector_record_source_items_delete" type="Centraliza\Connector\Entity\Stock\Plugin\RecordSourceItemsDelete"/>
+    </type>
     <type name="Magento\Catalog\Model\Product\Action">
         <plugin name="centraliza_connector_record_website_assignment" type="Centraliza\Connector\Entity\Product\Plugin\RecordWebsiteAssignment"/>
+    </type>
+    <type name="Magento\Inventory\Model\SourceItem\Command\DecrementSourceItemQty">
+        <plugin name="centraliza_connector_record_source_item_decrement" type="Centraliza\Connector\Entity\Stock\Plugin\RecordSourceItemDecrement"/>
     </type>
 
     <type name="Magento\Framework\DB\Adapter\AdapterInterface">
