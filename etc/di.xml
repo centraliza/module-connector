@@ -69,6 +69,18 @@
     <type name="Magento\Inventory\Model\ResourceModel\SourceItem\DeleteMultiple">
         <plugin name="centraliza_connector_record_source_items_delete" type="Centraliza\Connector\Entity\Stock\Plugin\RecordSourceItemsDelete"/>
     </type>
+    <type name="Magento\InventoryCatalogApi\Api\BulkSourceAssignInterface">
+        <plugin name="centraliza_connector_record_bulk_source_operation" type="Centraliza\Connector\Entity\Stock\Plugin\RecordBulkSourceOperation"/>
+    </type>
+    <type name="Magento\InventoryCatalogApi\Api\BulkSourceUnassignInterface">
+        <plugin name="centraliza_connector_record_bulk_source_operation" type="Centraliza\Connector\Entity\Stock\Plugin\RecordBulkSourceOperation"/>
+    </type>
+    <type name="Magento\InventoryCatalogApi\Api\BulkInventoryTransferInterface">
+        <plugin name="centraliza_connector_record_bulk_source_operation" type="Centraliza\Connector\Entity\Stock\Plugin\RecordBulkSourceOperation"/>
+    </type>
+    <type name="Magento\InventoryCatalogApi\Api\BulkPartialInventoryTransferInterface">
+        <plugin name="centraliza_connector_record_bulk_source_operation" type="Centraliza\Connector\Entity\Stock\Plugin\RecordBulkSourceOperation"/>
+    </type>
     <type name="Magento\Catalog\Model\Product\Action">
         <plugin name="centraliza_connector_record_website_assignment" type="Centraliza\Connector\Entity\Product\Plugin\RecordWebsiteAssignment"/>
     </type>
