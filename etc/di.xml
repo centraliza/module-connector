@@ -40,7 +40,25 @@
         </arguments>
     </type>
 
-    <preference for="Centraliza\Connector\Core\Port\TransportInterface" type="Centraliza\Connector\Infra\Http\DryRunTransport"/>
+    <preference for="Centraliza\Connector\Core\Port\TransportInterface" type="Centraliza\Connector\Infra\Http\SwitchingTransport"/>
+
+    <type name="Centraliza\Connector\Infra\Http\HttpTransport">
+        <arguments>
+            <argument name="client" xsi:type="object">GuzzleHttp\Client</argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Config\Model\Config\TypePool">
+        <arguments>
+            <argument name="sensitive" xsi:type="array">
+                <item name="centraliza_connector/general/api_key" xsi:type="string">1</item>
+            </argument>
+            <argument name="environment" xsi:type="array">
+                <item name="centraliza_connector/general/mode" xsi:type="string">1</item>
+                <item name="centraliza_connector/general/base_url" xsi:type="string">1</item>
+            </argument>
+        </arguments>
+    </type>
 
     <type name="Magento\Catalog\Model\ResourceModel\Product\Action">
         <plugin name="centraliza_connector_record_mass_attribute_update" type="Centraliza\Connector\Entity\Product\Plugin\RecordMassAttributeUpdate"/>
