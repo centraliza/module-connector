@@ -10,4 +10,7 @@
     <event name="catalog_product_delete_after">
         <observer name="centraliza_connector_record_product_delete" instance="Centraliza\Connector\Entity\Product\Observer\RecordDelete"/>
     </event>
+    <event name="customer_group_delete_before">
+        <observer name="centraliza_connector_record_group_tier_prices" instance="Centraliza\Connector\Entity\Price\Observer\RecordGroupDelete"/>
+    </event>
 </config>

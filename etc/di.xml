@@ -29,6 +29,12 @@
                         <item name="previous_sku" xsi:type="string">previous_sku</item>
                     </item>
                 </item>
+                <item name="prices" xsi:type="array">
+                    <item name="lane" xsi:type="string">bulk</item>
+                    <item name="key" xsi:type="array">
+                        <item name="sku" xsi:type="string">sku</item>
+                    </item>
+                </item>
                 <item name="stock" xsi:type="array">
                     <item name="lane" xsi:type="string">realtime</item>
                     <item name="key" xsi:type="array">
@@ -80,6 +86,15 @@
     </type>
     <type name="Magento\InventoryCatalogApi\Api\BulkPartialInventoryTransferInterface">
         <plugin name="centraliza_connector_record_bulk_source_operation" type="Centraliza\Connector\Entity\Stock\Plugin\RecordBulkSourceOperation"/>
+    </type>
+    <type name="Magento\Catalog\Api\BasePriceStorageInterface">
+        <plugin name="centraliza_connector_record_price_storage" type="Centraliza\Connector\Entity\Price\Plugin\RecordPriceStorage"/>
+    </type>
+    <type name="Magento\Catalog\Api\SpecialPriceStorageInterface">
+        <plugin name="centraliza_connector_record_price_storage" type="Centraliza\Connector\Entity\Price\Plugin\RecordPriceStorage"/>
+    </type>
+    <type name="Magento\Catalog\Api\TierPriceStorageInterface">
+        <plugin name="centraliza_connector_record_price_storage" type="Centraliza\Connector\Entity\Price\Plugin\RecordPriceStorage"/>
     </type>
     <type name="Magento\Catalog\Model\Product\Action">
         <plugin name="centraliza_connector_record_website_assignment" type="Centraliza\Connector\Entity\Product\Plugin\RecordWebsiteAssignment"/>
