@@ -20,11 +20,27 @@
     <type name="Centraliza\Connector\Core\Stream\StreamRegistry">
         <arguments>
             <argument name="streams" xsi:type="array">
+                <item name="products" xsi:type="array">
+                    <item name="lane" xsi:type="string">bulk</item>
+                    <item name="key" xsi:type="array">
+                        <item name="sku" xsi:type="string">sku</item>
+                    </item>
+                    <item name="optional" xsi:type="array">
+                        <item name="previous_sku" xsi:type="string">previous_sku</item>
+                    </item>
+                </item>
             </argument>
         </arguments>
     </type>
 
     <preference for="Centraliza\Connector\Core\Port\TransportInterface" type="Centraliza\Connector\Infra\Http\DryRunTransport"/>
+
+    <type name="Magento\Catalog\Model\ResourceModel\Product\Action">
+        <plugin name="centraliza_connector_record_mass_attribute_update" type="Centraliza\Connector\Entity\Product\Plugin\RecordMassAttributeUpdate"/>
+    </type>
+    <type name="Magento\Catalog\Model\Product\Action">
+        <plugin name="centraliza_connector_record_website_assignment" type="Centraliza\Connector\Entity\Product\Plugin\RecordWebsiteAssignment"/>
+    </type>
 
     <type name="Magento\Framework\DB\Adapter\AdapterInterface">
         <plugin name="centraliza_connector_transaction_boundary" type="Centraliza\Connector\Capture\TransactionBoundaryPlugin"/>
