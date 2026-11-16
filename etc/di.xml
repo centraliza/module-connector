@@ -35,6 +35,12 @@
                         <item name="sku" xsi:type="string">sku</item>
                     </item>
                 </item>
+                <item name="locations" xsi:type="array">
+                    <item name="lane" xsi:type="string">realtime</item>
+                    <item name="key" xsi:type="array">
+                        <item name="source_code" xsi:type="string">source_code</item>
+                    </item>
+                </item>
                 <item name="stock" xsi:type="array">
                     <item name="lane" xsi:type="string">realtime</item>
                     <item name="key" xsi:type="array">
@@ -95,6 +101,15 @@
     </type>
     <type name="Magento\Catalog\Api\TierPriceStorageInterface">
         <plugin name="centraliza_connector_record_price_storage" type="Centraliza\Connector\Entity\Price\Plugin\RecordPriceStorage"/>
+    </type>
+    <type name="Magento\InventoryApi\Api\SourceRepositoryInterface">
+        <plugin name="centraliza_connector_record_location_change" type="Centraliza\Connector\Entity\Location\Plugin\RecordLocationChange"/>
+    </type>
+    <type name="Magento\InventoryApi\Api\StockSourceLinksSaveInterface">
+        <plugin name="centraliza_connector_record_location_change" type="Centraliza\Connector\Entity\Location\Plugin\RecordLocationChange"/>
+    </type>
+    <type name="Magento\InventoryApi\Api\StockSourceLinksDeleteInterface">
+        <plugin name="centraliza_connector_record_location_change" type="Centraliza\Connector\Entity\Location\Plugin\RecordLocationChange"/>
     </type>
     <type name="Magento\Catalog\Model\Product\Action">
         <plugin name="centraliza_connector_record_website_assignment" type="Centraliza\Connector\Entity\Product\Plugin\RecordWebsiteAssignment"/>
