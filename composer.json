@@ -1,0 +1,29 @@
+{
+    "name": "caravel/module-centraliza-connector",
+    "description": "Reports store changes to Centraliza as connection events, in real time",
+    "type": "magento2-module",
+    "license": "proprietary",
+    "require": {
+        "php": "~8.3.0",
+        "magento/framework": "*",
+        "magento/framework-message-queue": "*",
+        "magento/module-cron": "*",
+        "magento/module-store": "*",
+        "magento/module-catalog": "*",
+        "magento/module-customer": "*",
+        "magento/module-eav": "*",
+        "magento/module-inventory": "*",
+        "magento/module-inventory-api": "*",
+        "magento/module-inventory-catalog-api": "*",
+        "magento/module-config": "*",
+        "guzzlehttp/guzzle": "^7.0"
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "Centraliza\\Connector\\": ""
+        }
+    }
+}
