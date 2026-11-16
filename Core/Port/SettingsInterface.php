@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Centraliza\Connector\Core\Port;
+
+interface SettingsInterface
+{
+    /**
+     * True when at least one store view reports to Centraliza.
+     */
+    public function isEnabled(): bool;
+
+    /**
+     * Websites that have at least one store view reporting to Centraliza.
+     *
+     * @return int[]
+     */
+    public function enabledWebsiteIds(): array;
+
+    /**
+     * The id of the Magento connection in Centraliza (Settings > Channels); empty when not configured.
+     */
+    public function connectionId(): string;
+}
