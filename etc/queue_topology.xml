@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework-message-queue:etc/topology.xsd">
+    <!-- One exact binding per topic: the DB exchange does not match wildcards. -->
+    <exchange name="magento">
+        <binding id="centralizaEventRealtime" topic="centraliza.event.realtime" destination="centraliza.event.realtime"/>
+        <binding id="centralizaEventBulk" topic="centraliza.event.bulk" destination="centraliza.event.bulk"/>
+    </exchange>
+</config>

@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework-message-queue:etc/publisher.xsd">
+    <!-- No connection on purpose: it resolves to amqp when the store has RabbitMQ and to db otherwise. -->
+    <publisher topic="centraliza.event.realtime"/>
+    <publisher topic="centraliza.event.bulk"/>
+</config>
