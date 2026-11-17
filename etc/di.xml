@@ -4,6 +4,15 @@
     <preference for="Centraliza\Connector\Core\Port\CircuitStoreInterface" type="Centraliza\Connector\Infra\Persistence\CircuitStore"/>
     <preference for="Centraliza\Connector\Core\Port\RetryStoreInterface" type="Centraliza\Connector\Infra\Persistence\RetryStore"/>
     <preference for="Centraliza\Connector\Core\Port\QuarantineStoreInterface" type="Centraliza\Connector\Infra\Persistence\QuarantineStore"/>
+    <preference for="Centraliza\Connector\Core\Port\TelemetryInterface" type="Centraliza\Connector\Infra\Telemetry\CompositeTelemetry"/>
+    <type name="Centraliza\Connector\Infra\Telemetry\CompositeTelemetry">
+        <arguments>
+            <argument name="destinations" xsi:type="array">
+                <item name="new_relic" xsi:type="object">Centraliza\Connector\Infra\Telemetry\NewRelicTelemetry</item>
+                <item name="log" xsi:type="object">Centraliza\Connector\Infra\Telemetry\LogTelemetry</item>
+            </argument>
+        </arguments>
+    </type>
     <preference for="Centraliza\Connector\Core\Port\RecordReaderInterface" type="Centraliza\Connector\Entity\RecordReader"/>
     <preference for="Centraliza\Connector\Core\Policy\DeliveryPolicyInterface" type="Centraliza\Connector\Core\Policy\ConnectionEventPolicy"/>
     <preference for="Centraliza\Connector\Core\Port\ChangeRecorderInterface" type="Centraliza\Connector\Capture\Collector"/>

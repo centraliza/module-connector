@@ -16,6 +16,7 @@ use Centraliza\Connector\Core\Port\ClockInterface;
 use Centraliza\Connector\Core\Port\RetryStoreInterface;
 use Centraliza\Connector\Cron\RetryDue;
 use Centraliza\Connector\Infra\Queue\QueuePublisher;
+use Centraliza\Connector\Core\Telemetry\NullTelemetry;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -92,6 +93,6 @@ class RetryDueTest extends TestCase
         $circuit = $this->createMock(CircuitStoreInterface::class);
         $circuit->method('load')->willReturn($state);
 
-        return new RetryDue($store, $publisher, $clock, new NullLogger(), new CircuitGate(new CircuitBreaker(), $circuit, $clock));
+        return new RetryDue($store, $publisher, $clock, new NullLogger(), new CircuitGate(new CircuitBreaker(), $circuit, $clock, new NullTelemetry()));
     }
 }

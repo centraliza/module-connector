@@ -79,6 +79,25 @@ class RetryStore implements RetryStoreInterface
         return $held;
     }
 
+    /**
+     * @return array{count: int, oldest: int|null} how many events are held and since when (unix seconds) the oldest is
+     */
+    public function summary(): array
+    {
+        $connection = $this->resource->getConnection();
+        $row = $connection->fetchRow(
+            $connection->select()->from(
+                $this->resource->getTableName(self::TABLE),
+                ['held' => 'COUNT(*)', 'oldest' => 'UNIX_TIMESTAMP(MIN(created_at))']
+            )
+        );
+
+        return [
+            'count' => (int)($row['held'] ?? 0),
+            'oldest' => isset($row['oldest']) ? (int)$row['oldest'] : null,
+        ];
+    }
+
     public function forget(array $idempotencyKeys): void
     {
         if ($idempotencyKeys === []) {

@@ -7,6 +7,7 @@ namespace Centraliza\Connector\Core\Breaker;
 use Centraliza\Connector\Core\Model\Outcome;
 use Centraliza\Connector\Core\Port\CircuitStoreInterface;
 use Centraliza\Connector\Core\Port\ClockInterface;
+use Centraliza\Connector\Core\Port\TelemetryInterface;
 
 /**
  * The circuit breaker as the sender uses it: ask before a request, tell after.
@@ -19,7 +20,8 @@ final readonly class CircuitGate
     public function __construct(
         private CircuitBreaker $breaker,
         private CircuitStoreInterface $store,
-        private ClockInterface $clock
+        private ClockInterface $clock,
+        private TelemetryInterface $telemetry
     ) {
     }
 
@@ -35,8 +37,12 @@ final readonly class CircuitGate
         if (!$allowed || $next->equals($state)) {
             return $allowed;
         }
+        if (!$this->store->compareAndSet($scope, $state, $next)) {
+            return false;
+        }
+        $this->tell($scope, $state, $next);
 
-        return $this->store->compareAndSet($scope, $state, $next);
+        return true;
     }
 
     /**
@@ -62,11 +68,33 @@ final readonly class CircuitGate
             $state = $this->store->load($scope);
             $next = $this->breaker->report($state, $outcome, $this->clock->now());
 
-            if ($next->equals($state) || $this->store->compareAndSet($scope, $state, $next)) {
+            if ($next->equals($state)) {
+                return;
+            }
+            if ($this->store->compareAndSet($scope, $state, $next)) {
+                $this->tell($scope, $state, $next);
+
                 return;
             }
         }
         // Lost the race three times: other processes are reporting the same
         // outage or recovery, so the state is already moving the right way.
+    }
+
+    /**
+     * Only the process that made the change tells about it, and only when the status itself changed.
+     */
+    private function tell(string $scope, CircuitState $from, CircuitState $to): void
+    {
+        if ($from->status === $to->status) {
+            return;
+        }
+        $this->telemetry->event(TelemetryInterface::CIRCUIT, [
+            'scope' => $scope,
+            'from' => $from->status->value,
+            'to' => $to->status->value,
+            'level' => $to->level,
+            'openSeconds' => $to->status === CircuitStatus::Open ? max(0, $to->openUntil - $this->clock->now()) : 0,
+        ]);
     }
 }

@@ -16,6 +16,7 @@ use Centraliza\Connector\Core\Port\ClockInterface;
 use Centraliza\Connector\Core\Port\QuarantineStoreInterface;
 use Centraliza\Connector\Core\Port\RecordReaderInterface;
 use Centraliza\Connector\Core\Port\RetryStoreInterface;
+use Centraliza\Connector\Core\Port\TelemetryInterface;
 use Centraliza\Connector\Core\Port\TransportInterface;
 use Throwable;
 
@@ -36,7 +37,8 @@ final readonly class DeliverEvent
         private RetryStoreInterface $retryStore,
         private QuarantineStoreInterface $quarantine,
         private ClockInterface $clock,
-        private RecordReaderInterface $reader
+        private RecordReaderInterface $reader,
+        private TelemetryInterface $telemetry
     ) {
     }
 
@@ -47,34 +49,75 @@ final readonly class DeliverEvent
     {
         // Asked first without becoming the probe: with the circuit open there is no point in reading the record.
         if (!$this->gate->wouldAllow(self::CIRCUIT_SCOPE)) {
-            return $this->postponeForCircuit($held);
+            return $this->tell($held, $this->postponeForCircuit($held), 'circuit_open');
         }
 
         $event = $held->event;
+        $readMs = null;
         if ($event->verb !== EventVerb::Deleted && $this->reader->supports($event->stream)) {
+            $startedAt = hrtime(true);
             try {
                 $record = $this->reader->read($event->stream, $event->key);
             } catch (Throwable $e) {
                 // The store could not read its own record: an attempt is spent, but Centraliza is not to blame.
                 // The message is the store's own, about its own record: it says what to fix.
                 $reason = $e::class . ': ' . substr($e->getMessage(), 0, 150);
+                $action = $this->settle($held, Outcome::unavailable(null, 'Could not read the record: ' . $reason), $jitter);
 
-                return $this->settle($held, Outcome::unavailable(null, 'Could not read the record: ' . $reason), $jitter);
+                return $this->tell($held, $action, 'record_unreadable', $reason, $this->msSince($startedAt));
             }
+            $readMs = $this->msSince($startedAt);
             if ($record === null) {
-                return Action::Skipped;
+                return $this->tell($held, Action::Skipped, 'record_gone', '', $readMs);
             }
             $event = $event->withRecord($record);
         }
 
         if (!$this->gate->allow(self::CIRCUIT_SCOPE)) {
-            return $this->postponeForCircuit($held);
+            return $this->tell($held, $this->postponeForCircuit($held), 'circuit_open', '', $readMs);
         }
 
+        $startedAt = hrtime(true);
         $outcome = $this->transport->send($event);
+        $sendMs = $this->msSince($startedAt);
         $this->gate->report(self::CIRCUIT_SCOPE, $outcome);
 
-        return $this->settle($held, $outcome, $jitter);
+        return $this->tell($held, $this->settle($held, $outcome, $jitter), $outcome->kind->value, $outcome->detail, $readMs, $sendMs);
+    }
+
+    /**
+     * @param string $outcome how the send was answered, or why nothing was sent
+     */
+    private function tell(
+        HeldEvent $held,
+        Action $action,
+        string $outcome,
+        string $detail = '',
+        ?int $readMs = null,
+        ?int $sendMs = null
+    ): Action {
+        $occurredAt = strtotime($held->event->occurredAt);
+        $this->telemetry->event(TelemetryInterface::DELIVERY, [
+            'stream' => $held->event->stream,
+            'verb' => $held->event->verb->value,
+            'lane' => $held->lane,
+            'action' => $action->value,
+            'outcome' => $outcome,
+            'detail' => substr($detail, 0, 200),
+            // Failed sends this event has had before this one.
+            'attempts' => $held->attempts,
+            'readMs' => $readMs,
+            'sendMs' => $sendMs,
+            // From the change in the store until now.
+            'lagSeconds' => $occurredAt === false ? null : max(0, $this->clock->now() - $occurredAt),
+        ]);
+
+        return $action;
+    }
+
+    private function msSince(int|float $startedAt): int
+    {
+        return (int)round((hrtime(true) - $startedAt) / 1_000_000);
     }
 
     private function postponeForCircuit(HeldEvent $held): Action

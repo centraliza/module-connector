@@ -4,5 +4,8 @@
         <job name="centraliza_connector_retry_due" instance="Centraliza\Connector\Cron\RetryDue" method="execute">
             <schedule>* * * * *</schedule>
         </job>
+        <job name="centraliza_connector_report_health" instance="Centraliza\Connector\Cron\ReportHealth" method="execute">
+            <schedule>* * * * *</schedule>
+        </job>
     </group>
 </config>

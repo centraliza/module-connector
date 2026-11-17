@@ -19,10 +19,12 @@ use Centraliza\Connector\Core\Port\ClockInterface;
 use Centraliza\Connector\Core\Port\QuarantineStoreInterface;
 use Centraliza\Connector\Core\Port\RecordReaderInterface;
 use Centraliza\Connector\Core\Port\RetryStoreInterface;
+use Centraliza\Connector\Core\Port\TelemetryInterface;
 use Centraliza\Connector\Core\Port\SettingsInterface;
 use Centraliza\Connector\Core\Port\TransportInterface;
 use Centraliza\Connector\Core\Service\Backoff;
 use Centraliza\Connector\Core\Service\DeliverEvent;
+use Centraliza\Connector\Core\Telemetry\NullTelemetry;
 use PHPUnit\Framework\TestCase;
 
 class DeliverEventTest extends TestCase
@@ -44,6 +46,9 @@ class DeliverEventTest extends TestCase
     private array|null|false $record = ['sku' => 'A', 'name' => 'Luva'];
 
     private int $reads = 0;
+
+    /** @var array<int, array{0: string, 1: array<string, mixed>}> */
+    private array $told = [];
 
     public function testAnAcceptedEventLeavesNothingBehind(): void
     {
@@ -142,6 +147,44 @@ class DeliverEventTest extends TestCase
         self::assertStringStartsWith('unavailable Could not read the record:', $this->held[0][4]);
     }
 
+    public function testEveryEventTakenFromTheQueueIsToldToTelemetryWithoutItsRecord(): void
+    {
+        $this->service(Outcome::unavailable(null, 'HTTP 503'))->deliver($this->event(2), 1.0);
+
+        [$name, $attributes] = $this->told[0];
+        self::assertSame('CentralizaDelivery', $name);
+        self::assertSame('products', $attributes['stream']);
+        self::assertSame('retry', $attributes['action']);
+        self::assertSame('unavailable', $attributes['outcome']);
+        self::assertSame('HTTP 503', $attributes['detail']);
+        self::assertSame(2, $attributes['attempts']);
+        self::assertIsInt($attributes['sendMs']);
+        self::assertArrayNotHasKey('record', $attributes);
+        self::assertStringNotContainsString('Luva', (string)json_encode($attributes));
+    }
+
+    public function testAnEventHeldByTheOpenCircuitIsToldAsSuch(): void
+    {
+        $service = $this->service(Outcome::of(OutcomeKind::Unauthorized));
+        $service->deliver($this->event(0), 0.0);
+        $this->told = [];
+
+        $service->deliver($this->event(0), 0.0);
+
+        self::assertSame('circuit_open', $this->told[0][1]['outcome']);
+        self::assertNull($this->told[0][1]['sendMs']);
+    }
+
+    private function telemetry(): TelemetryInterface
+    {
+        $telemetry = $this->createStub(TelemetryInterface::class);
+        $telemetry->method('event')->willReturnCallback(function (string $name, array $attributes): void {
+            $this->told[] = [$name, $attributes];
+        });
+
+        return $telemetry;
+    }
+
     private function reader(): RecordReaderInterface
     {
         $reader = $this->createStub(RecordReaderInterface::class);
@@ -206,13 +249,14 @@ class DeliverEventTest extends TestCase
         $settings->method('maxAttempts')->willReturn(5);
 
         return new DeliverEvent(
-            new CircuitGate(new CircuitBreaker(), $store, $clock),
+            new CircuitGate(new CircuitBreaker(), $store, $clock, new NullTelemetry()),
             $transport,
             new ConnectionEventPolicy(new Backoff(30, 3600), $settings),
             $retry,
             $quarantine,
             $clock,
-            $this->reader()
+            $this->reader(),
+            $this->telemetry()
         );
     }
 }

@@ -17,6 +17,7 @@ class Settings implements SettingsInterface
     private const XML_PATH_API_KEY = 'centraliza_connector/general/api_key';
     private const XML_PATH_BASE_URL = 'centraliza_connector/general/base_url';
     private const XML_PATH_GUEST_CARTS = 'centraliza_connector/carts/guests';
+    private const XML_PATH_TELEMETRY_LOG = 'centraliza_connector/general/telemetry_log';
     private const XML_PATH_MAX_ATTEMPTS = 'centraliza_connector/delivery/max_attempts';
 
     private const DEFAULT_MAX_ATTEMPTS = 5;
@@ -58,9 +59,30 @@ class Settings implements SettingsInterface
         return null;
     }
 
+    /**
+     * The host of the store view that reports, to tell stores apart in telemetry.
+     */
+    public function reportingHost(): string
+    {
+        $storeId = $this->reportingStoreId();
+        if ($storeId === null) {
+            return '';
+        }
+
+        return (string)parse_url((string)$this->scopeConfig->getValue('web/secure/base_url', ScopeInterface::SCOPE_STORE, $storeId), PHP_URL_HOST);
+    }
+
     public function connectionId(): string
     {
         return trim((string)$this->scopeConfig->getValue(self::XML_PATH_CONNECTION_ID));
+    }
+
+    /**
+     * Whether telemetry is also written to a log file. No admin field: set it where it is needed.
+     */
+    public function logsTelemetry(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_TELEMETRY_LOG);
     }
 
     public function maxAttempts(): int
