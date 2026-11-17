@@ -184,6 +184,7 @@
                 <item name="centraliza_connector_quarantine_list" xsi:type="object">Centraliza\Connector\Console\Command\QuarantineList</item>
                 <item name="centraliza_connector_quarantine_retry" xsi:type="object">Centraliza\Connector\Console\Command\QuarantineRetry</item>
                 <item name="centraliza_connector_quarantine_discard" xsi:type="object">Centraliza\Connector\Console\Command\QuarantineDiscard</item>
+                <item name="centraliza_connector_legacy_import_config" xsi:type="object">Centraliza\Connector\Console\Command\LegacyImportConfig</item>
             </argument>
         </arguments>
     </type>

@@ -443,6 +443,24 @@ Configuração em Stores > Configuration > Services > Centraliza Connector:
 
 Em modo `live` sem chave ou sem `connection_id`, nada é enviado: o evento é retido como em um `401`, sem gastar tentativa.
 
+### Migração dos módulos antigos
+
+Os módulos antigos (`Centraliza_Base`, `Centraliza_Notification`, `Centraliza_Sales`) continuam instalados e ativos no `config.php`, e são desligados por configuração. Desabilitá-los com `module:disable` faz o `setup:upgrade` seguinte apagar as tabelas deles: a whitelist do declarative schema vem de todos os módulos registrados, mas a declaração só dos ativos.
+
+```bash
+bin/magento centraliza:legacy:import-config --dry-run
+bin/magento centraliza:legacy:import-config --connection-id=<uuid> --disable-legacy
+```
+
+| O que | De | Para |
+|---|---|---|
+| chave da API | `centraliza/general/api_key` (por website, criptografada) | `centraliza_connector/general/api_key` (global, recriptografada) |
+| websites ligados | websites com `centraliza/general/enabled` = 1 e essa chave | `centraliza_connector/general/enabled` = 1 no escopo do website |
+| `connection_id` | não existe nos antigos | `--connection-id` |
+| fluxos antigos (`--disable-legacy`) | `centraliza/general/enabled`, `notification/general/enabled`, `order_notification/enabled`, `abandoned_cart/enabled`, `cart_redirect/enabled` | `0` no escopo default e em todo escopo que tenha valor próprio |
+
+O comando nunca desliga um website no conector e não mexe no `mode`. Rodar de novo depois do `--disable-legacy` não desfaz nada. Se os websites tiverem chaves diferentes, ele para e pede `--website=<code>`: o conector tem uma conexão só. A chave nunca é impressa, só um fingerprint `sha256:` de 8 caracteres.
+
 ## Observabilidade (New Relic)
 
 O módulo registra três eventos customizados pela porta `Core\Port\TelemetryInterface`. O adaptador `Infra\Telemetry\NewRelicTelemetry` usa `newrelic_record_custom_event`; sem a extensão do agente carregada, nada acontece. Nenhum evento leva o `record`, que pode conter dado pessoal.
