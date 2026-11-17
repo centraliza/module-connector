@@ -18,6 +18,7 @@ use Centraliza\Connector\Core\Port\CircuitStoreInterface;
 use Centraliza\Connector\Core\Port\ClockInterface;
 use Centraliza\Connector\Core\Port\QuarantineStoreInterface;
 use Centraliza\Connector\Core\Port\RetryStoreInterface;
+use Centraliza\Connector\Core\Port\SettingsInterface;
 use Centraliza\Connector\Core\Port\TransportInterface;
 use Centraliza\Connector\Core\Service\Backoff;
 use Centraliza\Connector\Core\Service\DeliverEvent;
@@ -78,8 +79,8 @@ class DeliverEventTest extends TestCase
 
     public function testTheLastAttemptOfAnOutageGoesToQuarantine(): void
     {
-        self::assertSame(Action::Quarantine, $this->service(Outcome::unavailable())->deliver($this->event(7), 0.0));
-        self::assertSame(8, $this->quarantined[0][2]);
+        self::assertSame(Action::Quarantine, $this->service(Outcome::unavailable())->deliver($this->event(4), 0.0));
+        self::assertSame(5, $this->quarantined[0][2]);
     }
 
     public function testWithTheCircuitOpenNothingIsSentAndNoAttemptIsSpent(): void
@@ -138,10 +139,13 @@ class DeliverEventTest extends TestCase
             }
         };
 
+        $settings = $this->createStub(SettingsInterface::class);
+        $settings->method('maxAttempts')->willReturn(5);
+
         return new DeliverEvent(
             new CircuitGate(new CircuitBreaker(), $store, $clock),
             $transport,
-            new ConnectionEventPolicy(new Backoff(30, 3600), 8),
+            new ConnectionEventPolicy(new Backoff(30, 3600), $settings),
             $retry,
             $quarantine,
             $clock

@@ -28,6 +28,14 @@
                     <comment>UUID of the Magento connection, from Centraliza > Settings > Channels.</comment>
                 </field>
             </group>
+            <group id="delivery" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Delivery</label>
+                <field id="max_attempts" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                    <label>Maximum attempts</label>
+                    <validate>required-entry validate-digits validate-greater-than-zero</validate>
+                    <comment>How many times an event is sent while Centraliza is unavailable. Each failure waits longer before the next try; the last one moves the event to quarantine, where it stays until someone reviews it.</comment>
+                </field>
+            </group>
         </section>
     </system>
 </config>

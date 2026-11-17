@@ -8,6 +8,7 @@ use Centraliza\Connector\Core\Model\Action;
 use Centraliza\Connector\Core\Model\Outcome;
 use Centraliza\Connector\Core\Model\OutcomeKind;
 use Centraliza\Connector\Core\Policy\ConnectionEventPolicy;
+use Centraliza\Connector\Core\Port\SettingsInterface;
 use Centraliza\Connector\Core\Service\Backoff;
 use PHPUnit\Framework\TestCase;
 
@@ -20,7 +21,9 @@ class ConnectionEventPolicyTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->policy = new ConnectionEventPolicy(new Backoff(30, 3600), 8);
+        $settings = $this->createStub(SettingsInterface::class);
+        $settings->method('maxAttempts')->willReturn(5);
+        $this->policy = new ConnectionEventPolicy(new Backoff(30, 3600), $settings);
     }
 
     public function testAnAcceptedEventIsDone(): void
@@ -72,7 +75,7 @@ class ConnectionEventPolicyTest extends TestCase
 
     public function testAnOutageIsQuarantinedOnlyAfterTheLastAttempt(): void
     {
-        self::assertSame(Action::Retry, $this->policy->decide(Outcome::unavailable(), 7, 0.0)->action);
-        self::assertSame(Action::Quarantine, $this->policy->decide(Outcome::unavailable(), 8, 0.0)->action);
+        self::assertSame(Action::Retry, $this->policy->decide(Outcome::unavailable(), 4, 0.0)->action);
+        self::assertSame(Action::Quarantine, $this->policy->decide(Outcome::unavailable(), 5, 0.0)->action);
     }
 }

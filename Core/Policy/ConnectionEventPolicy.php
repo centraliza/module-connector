@@ -8,6 +8,7 @@ use Centraliza\Connector\Core\Model\Action;
 use Centraliza\Connector\Core\Model\Decision;
 use Centraliza\Connector\Core\Model\Outcome;
 use Centraliza\Connector\Core\Model\OutcomeKind;
+use Centraliza\Connector\Core\Port\SettingsInterface;
 use Centraliza\Connector\Core\Service\Backoff;
 
 /**
@@ -21,7 +22,7 @@ final readonly class ConnectionEventPolicy implements DeliveryPolicyInterface
 {
     public function __construct(
         private Backoff $backoff,
-        private int $maxAttempts = 8
+        private SettingsInterface $settings
     ) {
     }
 
@@ -33,7 +34,7 @@ final readonly class ConnectionEventPolicy implements DeliveryPolicyInterface
             OutcomeKind::RateLimited,
             OutcomeKind::Unauthorized,
             OutcomeKind::RouteRefused => new Decision(Action::Postpone, max(0, (int)$outcome->retryAfterSeconds)),
-            OutcomeKind::Unavailable => $attempts >= $this->maxAttempts
+            OutcomeKind::Unavailable => $attempts >= $this->settings->maxAttempts()
                 ? new Decision(Action::Quarantine)
                 : new Decision(
                     Action::Retry,

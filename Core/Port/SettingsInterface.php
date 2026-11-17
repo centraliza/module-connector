@@ -22,4 +22,11 @@ interface SettingsInterface
      * The id of the Magento connection in Centraliza (Settings > Channels); empty when not configured.
      */
     public function connectionId(): string;
+
+    /**
+     * How many failed sends one event may have. The failure that reaches this
+     * number sends the event to quarantine. Never less than 1.
+     */
+    public function maxAttempts(): int;
+
 }
