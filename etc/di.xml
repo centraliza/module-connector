@@ -81,11 +81,18 @@
         </arguments>
     </type>
 
-    <!-- One reader per stream whose events carry the record. A stream with no reader is reported with its key only. -->
+    <!-- One reader per stream. A stream with no reader would be reported with its key only. -->
     <type name="Centraliza\Connector\Entity\RecordReader">
         <arguments>
             <argument name="readers" xsi:type="array">
                 <item name="products" xsi:type="object">Centraliza\Connector\Entity\Product\ProductReader</item>
+                <item name="prices" xsi:type="object">Centraliza\Connector\Entity\Price\PriceReader</item>
+                <item name="stock" xsi:type="object">Centraliza\Connector\Entity\Stock\StockReader</item>
+                <item name="locations" xsi:type="object">Centraliza\Connector\Entity\Location\LocationReader</item>
+                <item name="customers" xsi:type="object">Centraliza\Connector\Entity\Customer\CustomerReader</item>
+                <item name="customer_groups" xsi:type="object">Centraliza\Connector\Entity\CustomerGroup\CustomerGroupReader</item>
+                <item name="orders" xsi:type="object">Centraliza\Connector\Entity\Order\OrderReader</item>
+                <item name="carts" xsi:type="object">Centraliza\Connector\Entity\Cart\CartReader</item>
             </argument>
         </arguments>
     </type>

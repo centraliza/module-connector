@@ -13,6 +13,7 @@
             <module name="Magento_Inventory"/>
             <module name="Magento_InventoryApi"/>
             <module name="Magento_InventoryCatalogApi"/>
+            <module name="Magento_InventorySalesApi"/>
             <module name="Magento_Config"/>
         </sequence>
     </module>
