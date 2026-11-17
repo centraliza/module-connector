@@ -9,17 +9,17 @@ namespace Centraliza\Connector\Messaging\Model\Auth;
 
 use Centraliza\Connector\Infra\Config\Settings;
 use Centraliza\Connector\Messaging\Api\Data\ConnectionResultInterface;
+use Centraliza\Connector\Messaging\Api\ScopeResolverInterface;
 use Centraliza\Connector\Messaging\Model\Config;
 use Magento\Framework\App\Config\ReinitableConfigInterface;
-use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use SensitiveParameter;
 
 /**
- * Writes the validation state of the selected environment's key. The key lives at default scope, one per
- * environment, so the state does too; the website arguments are kept for the legacy callers and ignored.
+ * Writes the validation state of a website's key, at that website's scope (Default Config for a null website),
+ * one per environment.
  */
 class ConnectionStatus
 {
@@ -33,6 +33,7 @@ class ConnectionStatus
      * @param Settings $settings
      * @param DateTime $dateTime
      * @param RejectedKeyStore $rejectedKeyStore
+     * @param ScopeResolverInterface $scopeResolver
      */
     public function __construct(
         private readonly WriterInterface $configWriter,
@@ -41,12 +42,13 @@ class ConnectionStatus
         private readonly Config $config,
         private readonly Settings $settings,
         private readonly DateTime $dateTime,
-        private readonly RejectedKeyStore $rejectedKeyStore
+        private readonly RejectedKeyStore $rejectedKeyStore,
+        private readonly ScopeResolverInterface $scopeResolver
     ) {
     }
 
     /**
-     * Store the validated key and the resulting connection state of the selected environment.
+     * Store the validated key and the resulting connection state of the website's environment.
      *
      * @param ConnectionResultInterface $result
      * @param string $apiKey
@@ -60,19 +62,30 @@ class ConnectionStatus
         ?int $websiteId,
         bool $storeKey = true
     ): void {
+        // Revalidating the stored key must not write it back: on a website that inherits the default key, a copy
+        // saved at website scope would stop following the default.
         if ($storeKey) {
-            $this->save($this->settings->apiKeyPath(), $this->encryptor->encrypt($apiKey));
+            $this->save($this->settings->apiKeyPath($websiteId), $this->encryptor->encrypt($apiKey), $websiteId);
         }
-        $this->save($this->config->forEnvironment(Config::PATH_CONNECTION_WORKSPACE_NAME), (string) $result->getWorkspaceName());
         $this->save(
-            $this->config->forEnvironment(Config::PATH_CONNECTION_VALIDATED_AT),
-            $this->dateTime->gmtDate(self::TIMESTAMP_FORMAT)
+            $this->config->forEnvironment(Config::PATH_CONNECTION_WORKSPACE_NAME, $websiteId),
+            (string) $result->getWorkspaceName(),
+            $websiteId
+        );
+        $this->save(
+            $this->config->forEnvironment(Config::PATH_CONNECTION_VALIDATED_AT, $websiteId),
+            $this->dateTime->gmtDate(self::TIMESTAMP_FORMAT),
+            $websiteId
         );
 
         // Last on purpose: isConnected() gates only on the API key hash, so an interruption before this line
         // leaves the old hash in place, which will not match the new key — the state fails closed to
         // "changed/pending" instead of showing a connected screen for a validation that never completed.
-        $this->save($this->config->forEnvironment(Config::PATH_CONNECTION_KEY_HASH), $this->config->hashApiKey($apiKey));
+        $this->save(
+            $this->config->forEnvironment(Config::PATH_CONNECTION_KEY_HASH, $websiteId),
+            $this->config->hashApiKey($apiKey),
+            $websiteId
+        );
 
         // Only after the hash: clearing the rejection earlier would let a request that dies mid-rotation leave a
         // refused key whose hash still matches reading as connected.
@@ -82,23 +95,20 @@ class ConnectionStatus
     }
 
     /**
-     * The rejected-key map is left alone: it describes keys, not this environment.
+     * The rejected-key map is left alone: it describes keys, not this website.
      *
      * @param int|null $websiteId
      * @return void
      */
     public function clear(?int $websiteId): void
     {
+        [$scope, $scopeId] = $this->scopeResolver->forWrite($websiteId);
         foreach ([
             Config::PATH_CONNECTION_KEY_HASH,
             Config::PATH_CONNECTION_WORKSPACE_NAME,
             Config::PATH_CONNECTION_VALIDATED_AT,
         ] as $path) {
-            $this->configWriter->delete(
-                $this->config->forEnvironment($path),
-                ScopeConfigInterface::SCOPE_TYPE_DEFAULT,
-                0
-            );
+            $this->configWriter->delete($this->config->forEnvironment($path, $websiteId), $scope, $scopeId);
         }
 
         $this->refresh();
@@ -124,11 +134,13 @@ class ConnectionStatus
     /**
      * @param string $path
      * @param string $value
+     * @param int|null $websiteId
      * @return void
      */
-    private function save(string $path, string $value): void
+    private function save(string $path, string $value, ?int $websiteId): void
     {
-        $this->configWriter->save($path, $value, ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 0);
+        [$scope, $scopeId] = $this->scopeResolver->forWrite($websiteId);
+        $this->configWriter->save($path, $value, $scope, $scopeId);
     }
 
     /**

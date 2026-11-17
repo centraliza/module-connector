@@ -130,14 +130,14 @@ class AuthenticateButton extends Field
     }
 
     /**
-     * Html id of the API key field of the saved environment, derived from its config path the same way Magento
-     * derives every config field's own id, so it cannot silently stop matching.
+     * Html id of the API key field of the website's saved environment, derived from its config path the same way
+     * Magento derives every config field's own id, so it cannot silently stop matching.
      *
      * @return string
      */
     public function getApiKeyFieldId(): string
     {
-        return str_replace('/', '_', $this->settings->apiKeyPath());
+        return str_replace('/', '_', $this->settings->apiKeyPath($this->getWebsiteId()));
     }
 
     /**
@@ -156,7 +156,7 @@ class AuthenticateButton extends Field
      */
     public function getEnvironment(): string
     {
-        return $this->settings->environment();
+        return $this->settings->environment($this->getWebsiteId());
     }
 
     /**

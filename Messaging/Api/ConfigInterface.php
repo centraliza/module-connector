@@ -30,11 +30,12 @@ interface ConfigInterface
     public function getApiKey(?int $websiteId = null): ?string;
 
     /**
-     * Base URL of the Centraliza API, always with a trailing slash.
+     * Base URL of the Centraliza API of the website's environment, always with a trailing slash.
      *
+     * @param int|null $websiteId
      * @return string
      */
-    public function getApiBaseUrl(): string;
+    public function getApiBaseUrl(?int $websiteId = null): string;
 
     /**
      * Whether every request to Centraliza is traced in the module's log file.

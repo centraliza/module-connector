@@ -10,21 +10,20 @@ namespace Centraliza\Connector\Messaging\Model;
 use Centraliza\Connector\Infra\Config\Settings;
 use Centraliza\Connector\Messaging\Api\ConfigInterface;
 use Centraliza\Connector\Messaging\Model\Auth\RejectedKeyStore;
-use Magento\Framework\App\Config\ScopeConfigInterface;
 use SensitiveParameter;
 
 /**
- * The legacy Centraliza_Base configuration, read from this module's connection: one API key per environment
- * (production or staging) at default scope, where the legacy modules kept one per website. The website
- * argument of the interface only matters to isEnabled() and isReady().
+ * The legacy Centraliza_Base configuration, read from this module's connection: per website, as the legacy
+ * modules had it, with one API key per environment (production or staging). A null website is the website that
+ * reports (Infra\Config\Settings::reportingWebsiteId()), or Default Config when none does.
  */
 class Config implements ConfigInterface
 {
     public const PATH_DEBUG = 'centraliza_connector/general/debug';
 
     /**
-     * The validation state of each environment's key: these paths end in _production or _staging, so switching
-     * the environment never shows the other key as connected.
+     * The validation state of each website and environment's key, stored at website scope: these paths end in
+     * _production or _staging, so switching the environment never shows the other key as connected.
      */
     public const PATH_CONNECTION_KEY_HASH = 'centraliza_connector/connection/key_hash_';
     public const PATH_CONNECTION_WORKSPACE_NAME = 'centraliza_connector/connection/workspace_name_';
@@ -41,13 +40,11 @@ class Config implements ConfigInterface
     private const API_VERSION_PATH = '/v1/';
 
     /**
-     * @param ScopeConfigInterface $scopeConfig
      * @param Settings $settings
      * @param RejectedKeyStore $rejectedKeyStore
      * @param LegacyModules $legacyModules
      */
     public function __construct(
-        private readonly ScopeConfigInterface $scopeConfig,
         private readonly Settings $settings,
         private readonly RejectedKeyStore $rejectedKeyStore,
         private readonly LegacyModules $legacyModules
@@ -55,7 +52,7 @@ class Config implements ConfigInterface
     }
 
     /**
-     * On when the website has a store view set to "Report changes to Centraliza"; null asks for any website.
+     * On for the website set to "Report changes to Centraliza" (one at a time); null asks for any website.
      *
      * @param int|null $websiteId
      * @return bool
@@ -71,24 +68,25 @@ class Config implements ConfigInterface
     }
 
     /**
-     * The key of the selected environment; the same for every website.
+     * The key of the website's environment.
      *
      * @param int|null $websiteId
      * @return string|null
      */
     public function getApiKey(?int $websiteId = null): ?string
     {
-        $apiKey = $this->settings->apiKey();
+        $apiKey = $this->settings->apiKey($websiteId);
 
         return $apiKey === '' ? null : $apiKey;
     }
 
     /**
+     * @param int|null $websiteId
      * @return string
      */
-    public function getApiBaseUrl(): string
+    public function getApiBaseUrl(?int $websiteId = null): string
     {
-        return $this->settings->baseUrl() . self::API_VERSION_PATH;
+        return $this->settings->baseUrl($websiteId) . self::API_VERSION_PATH;
     }
 
     /**
@@ -96,7 +94,7 @@ class Config implements ConfigInterface
      */
     public function isDebugEnabled(): bool
     {
-        return $this->scopeConfig->isSetFlag(self::PATH_DEBUG);
+        return (bool) $this->settings->get(self::PATH_DEBUG);
     }
 
     /**
@@ -108,12 +106,12 @@ class Config implements ConfigInterface
     public function isConnected(?int $websiteId = null): bool
     {
         // Cheapest check first: an unvalidated environment exits here.
-        $storedApiKeyHash = $this->getValue(self::PATH_CONNECTION_KEY_HASH);
+        $storedApiKeyHash = $this->getValue(self::PATH_CONNECTION_KEY_HASH, $websiteId);
         if ($storedApiKeyHash === null) {
             return false;
         }
 
-        $apiKey = $this->getApiKey();
+        $apiKey = $this->getApiKey($websiteId);
         if ($apiKey === null) {
             return false;
         }
@@ -156,7 +154,7 @@ class Config implements ConfigInterface
      */
     public function getWorkspaceName(?int $websiteId = null): ?string
     {
-        return $this->getValue(self::PATH_CONNECTION_WORKSPACE_NAME);
+        return $this->getValue(self::PATH_CONNECTION_WORKSPACE_NAME, $websiteId);
     }
 
     /**
@@ -165,7 +163,7 @@ class Config implements ConfigInterface
      */
     public function getValidatedAt(?int $websiteId = null): ?string
     {
-        return $this->getValue(self::PATH_CONNECTION_VALIDATED_AT);
+        return $this->getValue(self::PATH_CONNECTION_VALIDATED_AT, $websiteId);
     }
 
     /**
@@ -176,7 +174,7 @@ class Config implements ConfigInterface
      */
     public function getRejectedAt(?int $websiteId = null): ?string
     {
-        $apiKey = $this->getApiKey();
+        $apiKey = $this->getApiKey($websiteId);
         if ($apiKey === null) {
             return null;
         }
@@ -185,23 +183,25 @@ class Config implements ConfigInterface
     }
 
     /**
-     * The path of a per-environment value (PATH_CONNECTION_*) for the selected environment.
+     * The path of a per-environment value (PATH_CONNECTION_*) for the website's environment.
      *
      * @param string $path
+     * @param int|null $websiteId
      * @return string
      */
-    public function forEnvironment(string $path): string
+    public function forEnvironment(string $path, ?int $websiteId = null): string
     {
-        return $path . $this->settings->environment();
+        return $path . $this->settings->environment($websiteId);
     }
 
     /**
      * @param string $path one of the PATH_CONNECTION_* prefixes
+     * @param int|null $websiteId
      * @return string|null
      */
-    private function getValue(string $path): ?string
+    private function getValue(string $path, ?int $websiteId): ?string
     {
-        $value = $this->scopeConfig->getValue($this->forEnvironment($path));
+        $value = $this->settings->get($this->forEnvironment($path, $websiteId), $websiteId);
 
         // Not empty(): '0' is a real value (a workspace named "0").
         if (!is_string($value) || $value === '') {

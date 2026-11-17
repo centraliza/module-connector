@@ -84,7 +84,7 @@ class ClientFactory
 
         return $this->guzzleClientFactory->create([
             'config' => [
-                'base_uri' => $this->config->getApiBaseUrl(),
+                'base_uri' => $this->config->getApiBaseUrl($websiteId),
                 'http_errors' => false,
                 'allow_redirects' => false,
                 'timeout' => self::TIMEOUT_SECONDS,
@@ -102,7 +102,7 @@ class ClientFactory
     private function authenticationMiddleware(?int $websiteId, #[SensitiveParameter] ?string $apiKey): callable
     {
         $config = $this->config;
-        $baseUri = new Uri($config->getApiBaseUrl());
+        $baseUri = new Uri($config->getApiBaseUrl($websiteId));
 
         // The key is fixed for the whole call, retries included: it is the one the caller
         // validated or the scope's configured one, resolved before the first attempt.

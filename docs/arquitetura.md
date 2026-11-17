@@ -243,9 +243,13 @@ sequenceDiagram
 
 Os observers usam `_save_after` e `_delete_after`, que disparam dentro da transação. Quem garante o envio só depois do commit é o `Collector`.
 
-### Escopo por store view
+### Escopo por website
 
-`centraliza_connector/general/enabled` é lido no escopo de store view. Um website é coberto quando tem ao menos uma store view com o conector ligado. Só geram evento os produtos atribuídos a um website coberto, e o estoque dos SKUs desses produtos. Clientes seguem o `website_id` do cliente; pedidos e carrinhos, o website da store view em que foram feitos. Grupos de clientes e sources são globais.
+Toda a configuração é por website, e **um website reporta por vez**: o que tem `centraliza_connector/general/enabled` = Sim. Ambiente, chave, channel, modo, tentativas e limites são lidos no escopo dele (`Infra\Config\Settings`); o Default Config é só o que os websites herdam. O admin recusa ligar um segundo website, direto ou pelo Default Config (`Model\Config\Backend\ReportingWebsite`). Se dois ficarem ligados por fora do admin (CLI, SQL), vale o de menor id.
+
+Só geram evento os produtos atribuídos ao website que reporta, e o estoque dos SKUs desses produtos. Clientes seguem o `website_id` do cliente; pedidos e carrinhos, o website da store view em que foram feitos. Grupos de clientes e sources são globais e saem para a conexão do website que reporta. Os campos que variam por store view são lidos na store view padrão desse website.
+
+Na EPI Zeus, o website `base` reporta e o `shopping_seguranca` fica desligado. Para um segundo website usar a Centraliza com outra conexão, cada evento precisaria levar o website e sair para a conexão dele (captura, fila, retry, quarentena, leitura e breaker por website).
 
 Carrinho de visitante só é reportado se `centraliza_connector/carts/guests` estiver ligado para o website. Desligado (padrão), o carrinho passa a ser reportado quando ganha um cliente, e esse primeiro evento sai como `carts.created`.
 
@@ -256,7 +260,7 @@ Carrinho de visitante só é reportado se `centraliza_connector/carts/guests` es
 - **Estoque após troca de SKU:** o Magento mantém o item de estoque com o SKU antigo até a próxima gravação de estoque. O módulo não gera evento de estoque na troca.
 - **Preço promocional por data:** a entrada e a saída de vigência do `special_price` não geram evento; só a gravação das datas gera.
 - **Regras de preço de catálogo e `Caravel_Wholesale`:** fora do stream `prices`, que cobre só o preço bruto.
-- **`locations` não é filtrado por website:** sources são globais e saem sempre que alguma store view reporta.
+- **`locations` não é filtrado por website:** sources são globais e saem sempre que um website reporta.
 - **`customer_groups` não é filtrado por website:** grupos são globais, como os sources.
 - **Vários eventos do mesmo carrinho ou pedido na mesma requisição:** o dedup do `Collector` vale por transação. Uma requisição que grava o carrinho em duas transações gera dois `carts.updated`.
 - **Limpeza de carrinhos expirados:** o cron do Magento apaga os carrinhos um a um e cada um gera `carts.deleted`.
@@ -437,25 +441,25 @@ erDiagram
 
 `centraliza_rate_limit` é a cota de requisições por chave, compartilhada com as mensagens (ver [legado.md](legado.md#cota-compartilhada)). O módulo também declara, idênticas, as tabelas e colunas dos módulos antigos que as mensagens usam (`centraliza_notification`, `centraliza_sales_*`, `quote.centraliza_masked_id`, `sales_order.centraliza_masked_id`), para que desabilitar os antigos não as apague.
 
-Configuração em Stores > Configuration > Services > Centraliza Connector:
+Configuração em Stores > Configuration > Services > Centraliza Connector. Todos os campos são por website (com o Default Config como herança) e nenhum aparece em store view:
 
-| Caminho | Escopo | Uso |
-|---|---|---|
-| `centraliza_connector/general/enabled` | store view | liga a captura; o website é coberto se alguma store view dele estiver ligada |
-| `centraliza_connector/general/mode` | global | `dry_run` (padrão) ou `live` |
-| `centraliza_connector/general/environment` | global | `production` (app.centraliza.ai, padrão) ou `staging` (app.centraliza.dev); escolhe qual trio abaixo vale |
-| `centraliza_connector/general/api_key_{production,staging}` | global | chave `csk_` de cada ambiente, gravada com `Backend\Encrypted` e marcada como sensível; o admin mostra só a do ambiente selecionado |
-| `centraliza_connector/general/connection_id_{production,staging}` | global | channel ID (UUID da conexão Magento) de cada ambiente |
-| `centraliza_connector/carts/guests` | website | reporta carrinhos sem cliente; padrão Não |
-| `centraliza_connector/delivery/max_attempts` | global | quantas vezes um evento é enviado antes de ir para a quarentena; padrão 5 |
-| `centraliza_connector/delivery/request_limit` | global | requisições por minuto por chave, somando eventos e mensagens; padrão 60; 0 desliga o limite local; acima de 60 vale como 60 enquanto o `Centraliza_Base` estiver habilitado |
-| `centraliza_connector/delivery/bulk_quota_floor` | global | requisições por minuto reservadas para as mensagens; os eventos de conexão param quando restam estas; padrão 30 (de 21 até um a menos que o limite) |
-| `centraliza_connector/general/debug` | global | grava uma linha por requisição de mensagem em `var/log/centraliza.log` |
-| `centraliza_connector/connection/{key_hash,workspace_name,validated_at}_{production,staging}` | global, gravado pelo botão Autenticar | estado da validação da chave de cada ambiente; as mensagens só saem com a chave validada |
-| `centraliza_connector/connection/rejected_keys` | global | chaves que a Centraliza recusou, por hash |
-| `centraliza_connector/general/base_url_{production,staging}` | global, sem campo no admin | `https://api.centraliza.ai` e `https://api.centraliza.dev` |
+| Caminho | Uso |
+|---|---|
+| `centraliza_connector/general/enabled` | liga o website; um por vez |
+| `centraliza_connector/general/mode` | `dry_run` (padrão) ou `live` |
+| `centraliza_connector/general/environment` | `production` (app.centraliza.ai, padrão) ou `staging` (app.centraliza.dev); escolhe qual trio abaixo vale |
+| `centraliza_connector/general/api_key_{production,staging}` | chave `csk_` de cada ambiente, gravada com `Backend\Encrypted` e marcada como sensível; o admin mostra só a do ambiente selecionado |
+| `centraliza_connector/general/connection_id_{production,staging}` | channel ID (UUID da conexão Magento) de cada ambiente |
+| `centraliza_connector/carts/guests` | reporta carrinhos sem cliente; padrão Não |
+| `centraliza_connector/delivery/max_attempts` | quantas vezes um evento é enviado antes de ir para a quarentena; padrão 5 |
+| `centraliza_connector/delivery/request_limit` | requisições por minuto por chave, somando eventos e mensagens; padrão 60; 0 desliga o limite local; acima de 60 vale como 60 enquanto o `Centraliza_Base` estiver habilitado |
+| `centraliza_connector/delivery/bulk_quota_floor` | requisições por minuto reservadas para as mensagens; os eventos de conexão param quando restam estas; padrão 30 (de 21 até um a menos que o limite) |
+| `centraliza_connector/general/debug` | grava uma linha por requisição de mensagem em `var/log/centraliza.log` |
+| `centraliza_connector/connection/{key_hash,workspace_name,validated_at}_{production,staging}` | gravado pelo botão Autenticar (só no escopo de website): estado da validação da chave do website em cada ambiente; as mensagens só saem com a chave validada |
+| `centraliza_connector/connection/rejected_keys` | só no Default Config: chaves que a Centraliza recusou, por hash |
+| `centraliza_connector/general/base_url_{production,staging}` | sem campo no admin: `https://api.centraliza.ai` e `https://api.centraliza.dev` |
 
-Em modo `live` sem chave ou sem channel ID no ambiente selecionado, nada é enviado: o evento é retido como em um `401`, sem gastar tentativa. Trocar de ambiente não migra a fila: eventos ainda não entregues saem para o ambiente novo.
+Em modo `live` sem chave ou sem channel ID no ambiente do website, nada é enviado: o evento é retido como em um `401`, sem gastar tentativa. Trocar de ambiente não migra a fila: eventos ainda não entregues saem para o ambiente novo.
 
 `environment`, `mode` e as URLs são marcados como específicos de ambiente (vão para o `env.php` num `app:config:dump`), para HML apontar para staging e produção para produção sem conflito no `config.php`.
 
@@ -472,14 +476,16 @@ bin/magento centraliza:legacy:import-config --dry-run
 bin/magento centraliza:legacy:import-config --connection-id=<uuid> --disable-legacy-catalog
 ```
 
+O comando importa um website: o que tem a integração antiga ligada com chave, ou o de `--website=<code>`. Tudo é gravado no escopo desse website.
+
 | O que | De | Para |
 |---|---|---|
-| chave da API | `centraliza/general/api_key` (por website, criptografada) | `centraliza_connector/general/api_key_production` (global, recriptografada) |
-| websites ligados | websites com `centraliza/general/enabled` = 1 e essa chave | `centraliza_connector/general/enabled` = 1 no escopo do website |
-| channel ID | não existe nos antigos | `--connection-id` → `connection_id_production` |
+| chave da API | `centraliza/general/api_key` do website (criptografada) | `centraliza_connector/general/api_key_production` do website (recriptografada) |
+| website ligado | `centraliza/general/enabled` = 1 no website | `centraliza_connector/general/enabled` = 1 no website |
+| channel ID | não existe nos antigos | `--connection-id` → `connection_id_production` do website |
 | catálogo antigo (`--disable-legacy-catalog`) | `centraliza/notification/general/enabled` | `0` no escopo default e em todo escopo que tenha valor próprio |
 
-O comando nunca desliga um website no conector e não mexe no `mode` nem no `environment`. Rodar de novo não desfaz nada. Se os websites tiverem chaves diferentes, ele para e pede `--website=<code>`: o conector tem uma conexão só. A chave nunca é impressa, só um fingerprint `sha256:` de 8 caracteres.
+O comando nunca desliga um website no conector e não mexe no `mode` nem no `environment`. Rodar de novo não desfaz nada. Ele para se a integração antiga estiver ligada em mais de um website sem `--website`, ou se outro website já reportar no conector. A chave nunca é impressa, só um fingerprint `sha256:` de 8 caracteres.
 
 ## Observabilidade (New Relic)
 

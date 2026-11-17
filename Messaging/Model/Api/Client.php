@@ -133,7 +133,7 @@ class Client implements CentralizaClientInterface
     ): array {
         $relativePath = ltrim($path, '/');
 
-        $this->assertSameOrigin($relativePath);
+        $this->assertSameOrigin($relativePath, $websiteId);
         $this->assertAllowedOptions($options);
 
         // Guzzle reports curl's transfer info once per try, so "nothing was sent" is judged over every try.
@@ -178,8 +178,8 @@ class Client implements CentralizaClientInterface
 
         // Simulation mode (centraliza_connector/general/mode): a write is logged, never sent, and spends no
         // quota. A read (the key check) still goes out: it changes nothing at Centraliza.
-        if (!$this->settings->isLive() && !in_array(strtoupper($method), self::READ_METHODS, true)) {
-            return $this->simulate($method, $relativePath, $options);
+        if (!$this->settings->isLive($websiteId) && !in_array(strtoupper($method), self::READ_METHODS, true)) {
+            return $this->simulate($method, $relativePath, $options, $websiteId);
         }
 
         $apiKeyHash = $this->config->hashApiKey($apiKey);
@@ -246,15 +246,16 @@ class Client implements CentralizaClientInterface
      * @param string $method
      * @param string $relativePath
      * @param array $options
+     * @param int|null $websiteId
      * @return array
      * @throws CentralizaApiException when the log cannot be written: nothing was sent
      */
-    private function simulate(string $method, string $relativePath, array $options): array
+    private function simulate(string $method, string $relativePath, array $options, ?int $websiteId): array
     {
         unset($options[RequestOptions::ON_STATS]);
 
         try {
-            $this->dryRunLog->write($method, $this->config->getApiBaseUrl() . $relativePath, $options);
+            $this->dryRunLog->write($method, $this->config->getApiBaseUrl($websiteId) . $relativePath, $options);
         } catch (Throwable $throwable) {
             $this->logger->error(
                 'Centraliza simulation log could not be written',
@@ -474,14 +475,15 @@ class Client implements CentralizaClientInterface
      * Refuse any path that resolves outside the configured Centraliza base URI.
      *
      * @param string $relativePath
+     * @param int|null $websiteId
      * @return void
      * @throws CentralizaApiException
      */
-    private function assertSameOrigin(string $relativePath): void
+    private function assertSameOrigin(string $relativePath, ?int $websiteId): void
     {
         // The key goes wherever the request resolves: "host.tld:443/x" has no scheme yet leaves the base URI.
         try {
-            $baseUri = new Uri($this->config->getApiBaseUrl());
+            $baseUri = new Uri($this->config->getApiBaseUrl($websiteId));
         } catch (Throwable $throwable) {
             throw $this->unusableSetup($throwable);
         }

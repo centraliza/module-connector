@@ -1,29 +1,30 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
     <system>
-        <!-- Its own section: the legacy "centraliza" section is hidden at store view scope, and "enabled" is set there. -->
-        <section id="centraliza_connector" translate="label" type="text" sortOrder="11" showInDefault="1" showInWebsite="1" showInStore="1">
+        <!-- Every setting is per website: one website reports at a time and everything is read at its scope (Infra\Config\Settings). -->
+        <section id="centraliza_connector" translate="label" type="text" sortOrder="11" showInDefault="1" showInWebsite="1" showInStore="0">
             <label>Centraliza Connector</label>
             <tab>service</tab>
             <resource>Centraliza_Connector::config</resource>
-            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                 <label>Connection</label>
-                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
                     <label>Report changes to Centraliza</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Set per store view. A record is reported when it belongs to a website with at least one store view set to Yes.</comment>
+                    <backend_model>Centraliza\Connector\Model\Config\Backend\ReportingWebsite</backend_model>
+                    <comment>Turns Centraliza on for this website. One website at a time: every setting of this section is read at the scope of the website set to Yes, and Default Config is only what websites inherit.</comment>
                 </field>
-                <field id="mode" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                <field id="mode" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Mode</label>
                     <source_model>Centraliza\Connector\Model\Config\Source\Mode</source_model>
                     <comment>In simulation, each request is written to var/log/centraliza_connector_dry_run.jsonl instead of being sent.</comment>
                 </field>
-                <field id="environment" translate="label comment" type="select" sortOrder="25" showInDefault="1" showInWebsite="0" showInStore="0">
+                <field id="environment" translate="label comment" type="select" sortOrder="25" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Environment</label>
                     <source_model>Centraliza\Connector\Model\Config\Source\Environment</source_model>
                     <comment>Each environment keeps its own API key and channel ID: switching uses the pair saved for it.</comment>
                 </field>
-                <field id="api_key_production" translate="label comment" type="obscure" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                <field id="api_key_production" translate="label comment" type="obscure" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>API key</label>
                     <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
                     <comment>Production workspace key (csk_...), from app.centraliza.ai > Settings > API keys.</comment>
@@ -31,14 +32,14 @@
                         <field id="environment">production</field>
                     </depends>
                 </field>
-                <field id="connection_id_production" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+                <field id="connection_id_production" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Channel ID</label>
                     <comment>UUID of the Magento channel, from app.centraliza.ai > Settings > Channels.</comment>
                     <depends>
                         <field id="environment">production</field>
                     </depends>
                 </field>
-                <field id="api_key_staging" translate="label comment" type="obscure" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                <field id="api_key_staging" translate="label comment" type="obscure" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>API key</label>
                     <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
                     <comment>Staging workspace key (csk_...), from app.centraliza.dev > Settings > API keys.</comment>
@@ -46,19 +47,21 @@
                         <field id="environment">staging</field>
                     </depends>
                 </field>
-                <field id="connection_id_staging" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+                <field id="connection_id_staging" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Channel ID</label>
                     <comment>UUID of the Magento channel, from app.centraliza.dev > Settings > Channels.</comment>
                     <depends>
                         <field id="environment">staging</field>
                     </depends>
                 </field>
-                <!-- Checks the saved environment's key with GET admin/workspace; the messages need a checked key. -->
-                <field id="authenticate" translate="label" sortOrder="45" showInDefault="1" showInWebsite="0" showInStore="0">
+                <!-- Checks the website's key with GET admin/workspace; the messages need a checked key. Website scope only:
+                     the check is stored per website. -->
+                <field id="authenticate" translate="label comment" sortOrder="45" showInDefault="0" showInWebsite="1" showInStore="0">
                     <label>Status</label>
+                    <comment>Checks the key of this website's saved environment. Save the configuration first after changing the environment.</comment>
                     <frontend_model>Centraliza\Connector\Messaging\Block\Adminhtml\System\Config\AuthenticateButton</frontend_model>
                 </field>
-                <field id="debug" translate="label comment" type="select" sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                <field id="debug" translate="label comment" type="select" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
                     <label>Debug Log</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Writes one line per message request to Centraliza (method, path, status and error) to var/log/centraliza.log. Errors are written there whatever this setting. Turn it on while investigating and off afterwards.</comment>
@@ -72,20 +75,20 @@
                     <comment>When No, a cart is reported only once it belongs to a customer.</comment>
                 </field>
             </group>
-            <group id="delivery" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+            <group id="delivery" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
                 <label>Delivery</label>
-                <field id="max_attempts" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                <field id="max_attempts" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
                     <label>Maximum attempts</label>
                     <validate>required-entry validate-digits validate-greater-than-zero</validate>
                     <comment>How many times an event is sent while Centraliza is unavailable. Each failure waits longer before the next try; the last one moves the event to quarantine, where it stays until someone reviews it.</comment>
                 </field>
-                <field id="request_limit" translate="label comment" type="text" sortOrder="15" showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                <field id="request_limit" translate="label comment" type="text" sortOrder="15" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
                     <label>Request Limit Per Minute</label>
                     <backend_model>Centraliza\Connector\Messaging\Model\Config\Backend\RequestLimit</backend_model>
                     <validate>required-entry validate-digits</validate>
                     <comment>Requests per minute Centraliza allows each API key, counted together for the connection events and the order and cart messages; 60 is the limit measured so far. 0 turns the local limit off: only Centraliza's own answer (429) holds requests back. While the legacy Centraliza modules are enabled, a value above 60 counts as 60: they keep their own limit of 60 in the same count.</comment>
                 </field>
-                <field id="bulk_quota_floor" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                <field id="bulk_quota_floor" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
                     <label>Requests Kept For Messages</label>
                     <backend_model>Centraliza\Connector\Messaging\Model\Config\Backend\BulkQuotaFloor</backend_model>
                     <validate>required-entry validate-digits</validate>

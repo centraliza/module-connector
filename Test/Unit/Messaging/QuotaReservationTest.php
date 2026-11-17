@@ -8,7 +8,7 @@ use Centraliza\Connector\Messaging\Api\QuotaReservationInterface;
 use Centraliza\Connector\Messaging\Model\Api\QuotaReservation;
 use Centraliza\Connector\Messaging\Model\LegacyModules;
 use Centraliza\Connector\Messaging\Model\ResourceModel\RateLimit;
-use Magento\Framework\App\Config\ScopeConfigInterface;
+use Centraliza\Connector\Infra\Config\Settings;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -150,11 +150,11 @@ class QuotaReservationTest extends TestCase
 
     private function quota(): QuotaReservation
     {
-        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
-        $scopeConfig->method('getValue')->willReturnCallback(fn (string $path) => $this->config[$path] ?? null);
+        $settings = $this->createMock(Settings::class);
+        $settings->method('get')->willReturnCallback(fn (string $path) => $this->config[$path] ?? null);
         $legacy = $this->createMock(LegacyModules::class);
         $legacy->method('limiterActive')->willReturnCallback(fn () => $this->legacyLimiter);
 
-        return new QuotaReservation($this->rateLimit, $scopeConfig, new NullLogger(), $legacy);
+        return new QuotaReservation($this->rateLimit, $settings, new NullLogger(), $legacy);
     }
 }

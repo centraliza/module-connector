@@ -28,8 +28,9 @@ O que mudou no código transplantado, e por quê:
 
 | Classe | Mudança |
 |---|---|
-| `Messaging\Model\Config` | lê a conexão deste módulo: uma chave por ambiente, no escopo default; URL `base_url_<ambiente>` + `/v1/`. `isEnabled(website)` = alguma store view do website com "Report changes to Centraliza"; `isReady()` é falso enquanto `Centraliza_Sales` estiver habilitado |
-| `Messaging\Model\Auth\ConnectionStatus` | grava o estado da validação por ambiente (`centraliza_connector/connection/*_<ambiente>`), sempre no escopo default |
+| `Messaging\Model\Config` | lê a conexão deste módulo, por website como nos antigos: chave e URL (`base_url_<ambiente>` + `/v1/`) do ambiente do website; website nulo é o website que reporta. `isEnabled(website)` = o website com "Report changes to Centraliza" (um por vez); `isReady()` é falso enquanto `Centraliza_Sales` estiver habilitado |
+| `Messaging\Model\Auth\ConnectionStatus` | grava o estado da validação no escopo do website, por ambiente (`centraliza_connector/connection/*_<ambiente>`) |
+| `Messaging\Model\Api\Client`, `ClientFactory` | a URL base é a do ambiente do website da requisição (`getApiBaseUrl($websiteId)`) |
 | `Messaging\Model\Api\Client` | em modo simulação (`mode` = `dry_run`), toda escrita vai para `var/log/centraliza_connector_dry_run.jsonl` e não sai da loja; leitura (a validação da chave) sai normalmente |
 | `Messaging\Model\Api\QuotaReservation` | piso "bulk" em `centraliza_connector/delivery/bulk_quota_floor`; "bulk" agora são os eventos de conexão |
 | `Messaging\Block\...\AuthenticateButton` + `authenticate.js` | valida a chave do ambiente salvo; se o seletor de ambiente foi trocado e não salvo, pede para salvar antes; avisa enquanto os antigos estiverem ativos |

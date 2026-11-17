@@ -9,9 +9,16 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 
+/**
+ * Every setting is per website, with Default Config as what a website inherits.
+ *
+ * One website reports to Centraliza at a time (centraliza_connector/general/enabled on that website), and the
+ * module reads every other setting at that website's scope: environment, key, channel, mode, attempts, limits.
+ * The admin refuses turning a second website on; if one is turned on anyway (CLI, SQL), the lowest website id wins.
+ */
 class Settings implements SettingsInterface
 {
-    private const XML_PATH_ENABLED = 'centraliza_connector/general/enabled';
+    public const XML_PATH_ENABLED = 'centraliza_connector/general/enabled';
     private const XML_PATH_MODE = 'centraliza_connector/general/mode';
     private const XML_PATH_ENVIRONMENT = 'centraliza_connector/general/environment';
     /** Each environment has its own key, channel and API host: the paths end in _production or _staging. */
@@ -38,30 +45,56 @@ class Settings implements SettingsInterface
 
     public function isEnabled(): bool
     {
-        return $this->enabledWebsiteIds() !== [];
+        return $this->reportingWebsiteId() !== null;
+    }
+
+    /**
+     * Websites turned on, lowest id first, whatever the one-at-a-time rule says.
+     *
+     * @return int[]
+     */
+    public function websitesTurnedOn(): array
+    {
+        $websiteIds = [];
+        foreach ($this->storeManager->getWebsites() as $website) {
+            $websiteId = (int)$website->getId();
+            if ($this->scopeConfig->isSetFlag(self::XML_PATH_ENABLED, ScopeInterface::SCOPE_WEBSITE, $websiteId)) {
+                $websiteIds[] = $websiteId;
+            }
+        }
+        sort($websiteIds);
+
+        return $websiteIds;
+    }
+
+    /**
+     * The website that reports to Centraliza, or null when none does.
+     */
+    public function reportingWebsiteId(): ?int
+    {
+        return $this->websitesTurnedOn()[0] ?? null;
     }
 
     public function enabledWebsiteIds(): array
     {
-        $websiteIds = [];
-        foreach ($this->storeManager->getStores() as $store) {
-            if ($this->scopeConfig->isSetFlag(self::XML_PATH_ENABLED, ScopeInterface::SCOPE_STORE, $store->getId())) {
-                $websiteIds[(int)$store->getWebsiteId()] = (int)$store->getWebsiteId();
-            }
-        }
+        $websiteId = $this->reportingWebsiteId();
 
-        return array_values($websiteIds);
+        return $websiteId === null ? [] : [$websiteId];
     }
 
+    /**
+     * The default store view of the reporting website.
+     */
     public function reportingStoreId(): ?int
     {
-        foreach ($this->storeManager->getStores() as $store) {
-            if ($this->scopeConfig->isSetFlag(self::XML_PATH_ENABLED, ScopeInterface::SCOPE_STORE, $store->getId())) {
-                return (int)$store->getId();
-            }
+        $websiteId = $this->reportingWebsiteId();
+        if ($websiteId === null) {
+            return null;
         }
+        $groupId = (int)$this->storeManager->getWebsite($websiteId)->getDefaultGroupId();
+        $storeId = $groupId > 0 ? (int)$this->storeManager->getGroup((string)$groupId)->getDefaultStoreId() : 0;
 
-        return null;
+        return $storeId > 0 ? $storeId : null;
     }
 
     /**
@@ -78,21 +111,35 @@ class Settings implements SettingsInterface
     }
 
     /**
-     * Which Centraliza the store talks to: production (app.centraliza.ai) or staging (app.centraliza.dev).
+     * A setting of this module at a website's scope: the reporting website when none is given, Default Config
+     * when no website reports.
      */
-    public function environment(): string
+    public function get(string $path, ?int $websiteId = null): mixed
     {
-        return (string)$this->scopeConfig->getValue(self::XML_PATH_ENVIRONMENT) === self::ENV_STAGING
+        $websiteId ??= $this->reportingWebsiteId();
+        if ($websiteId === null) {
+            return $this->scopeConfig->getValue($path);
+        }
+
+        return $this->scopeConfig->getValue($path, ScopeInterface::SCOPE_WEBSITE, $websiteId);
+    }
+
+    /**
+     * Which Centraliza the website talks to: production (app.centraliza.ai) or staging (app.centraliza.dev).
+     */
+    public function environment(?int $websiteId = null): string
+    {
+        return (string)$this->get(self::XML_PATH_ENVIRONMENT, $websiteId) === self::ENV_STAGING
             ? self::ENV_STAGING
             : self::ENV_PRODUCTION;
     }
 
     /**
-     * The channel (connection) id of the selected environment.
+     * The channel (connection) id of the website's environment.
      */
-    public function connectionId(): string
+    public function connectionId(?int $websiteId = null): string
     {
-        return trim((string)$this->scopeConfig->getValue(self::XML_PATH_CONNECTION_ID . $this->environment()));
+        return trim((string)$this->get(self::XML_PATH_CONNECTION_ID . $this->environment($websiteId), $websiteId));
     }
 
     /**
@@ -100,12 +147,12 @@ class Settings implements SettingsInterface
      */
     public function logsTelemetry(): bool
     {
-        return $this->scopeConfig->isSetFlag(self::XML_PATH_TELEMETRY_LOG);
+        return (bool)$this->get(self::XML_PATH_TELEMETRY_LOG);
     }
 
     public function maxAttempts(): int
     {
-        $configured = (int)$this->scopeConfig->getValue(self::XML_PATH_MAX_ATTEMPTS);
+        $configured = (int)$this->get(self::XML_PATH_MAX_ATTEMPTS);
 
         return $configured >= 1 ? $configured : self::DEFAULT_MAX_ATTEMPTS;
     }
@@ -118,29 +165,29 @@ class Settings implements SettingsInterface
     /**
      * False while requests are only written to the dry-run log.
      */
-    public function isLive(): bool
+    public function isLive(?int $websiteId = null): bool
     {
-        return (string)$this->scopeConfig->getValue(self::XML_PATH_MODE) === self::MODE_LIVE;
+        return (string)$this->get(self::XML_PATH_MODE, $websiteId) === self::MODE_LIVE;
     }
 
     /**
-     * The workspace key (csk_...) of the selected environment, decrypted; empty when not configured.
+     * The workspace key (csk_...) of the website's environment, decrypted; empty when not configured.
      */
-    public function apiKey(): string
+    public function apiKey(?int $websiteId = null): string
     {
-        return trim((string)$this->scopeConfig->getValue($this->apiKeyPath()));
+        return trim((string)$this->get($this->apiKeyPath($websiteId), $websiteId));
     }
 
     /**
-     * Where the selected environment's key is stored (default scope, encrypted).
+     * Where the key of the website's environment is stored (encrypted).
      */
-    public function apiKeyPath(): string
+    public function apiKeyPath(?int $websiteId = null): string
     {
-        return self::XML_PATH_API_KEY . $this->environment();
+        return self::XML_PATH_API_KEY . $this->environment($websiteId);
     }
 
-    public function baseUrl(): string
+    public function baseUrl(?int $websiteId = null): string
     {
-        return rtrim(trim((string)$this->scopeConfig->getValue(self::XML_PATH_BASE_URL . $this->environment())), '/');
+        return rtrim(trim((string)$this->get(self::XML_PATH_BASE_URL . $this->environment($websiteId), $websiteId)), '/');
     }
 }

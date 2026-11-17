@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Centraliza\Connector\Console\Command;
 
+use Centraliza\Connector\Infra\Config\Settings;
 use Magento\Framework\App\Cache\Type\Config as ConfigCache;
 use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
@@ -20,14 +21,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
 /**
- * Copies the connection of the legacy Centraliza modules (Centraliza_Base and friends) to this one:
- * the API key, into the production slot (the legacy modules only talk to production), and the websites
- * the legacy integration was on. Optionally turns off the legacy catalog notifications, the one legacy
- * feature this module replaces.
- *
- * The legacy modules stay installed and enabled: order status messages, abandoned cart and the cart
- * recovery link still live there. Disabling them in config.php would also make the next setup:upgrade
- * drop their tables, because the schema whitelist still lists them.
+ * Copies the connection of the legacy Centraliza modules (Centraliza_Base and friends) to one website of this
+ * module: the API key, into the production slot (the legacy modules only talk to production), and the website's
+ * switch when the legacy integration was on there. Everything is written at that website's scope: this module
+ * reports one website at a time. Optionally turns off the legacy catalog notifications, which this module
+ * replaces.
  */
 class LegacyImportConfig extends Command
 {
@@ -44,10 +42,8 @@ class LegacyImportConfig extends Command
         'centraliza/notification/general/enabled',
     ];
 
-    private const ENABLED = 'centraliza_connector/general/enabled';
     private const API_KEY = 'centraliza_connector/general/api_key_production';
     private const CONNECTION_ID = 'centraliza_connector/general/connection_id_production';
-    private const ENVIRONMENT = 'centraliza_connector/general/environment';
     private const MODE = 'centraliza_connector/general/mode';
 
     public function __construct(
@@ -56,7 +52,8 @@ class LegacyImportConfig extends Command
         private readonly EncryptorInterface $encryptor,
         private readonly WriterInterface $writer,
         private readonly ResourceConnection $resource,
-        private readonly TypeListInterface $cacheTypes
+        private readonly TypeListInterface $cacheTypes,
+        private readonly Settings $settings
     ) {
         parent::__construct();
     }
@@ -64,7 +61,7 @@ class LegacyImportConfig extends Command
     protected function configure(): void
     {
         $this->setName('centraliza:legacy:import-config')
-            ->setDescription('Copies the API key and enabled websites of the legacy Centraliza modules to Centraliza Connector (production)')
+            ->setDescription('Copies the API key of the legacy Centraliza modules to one website of Centraliza Connector (production)')
             ->addOption(
                 self::OPTION_CONNECTION_ID,
                 null,
@@ -75,7 +72,7 @@ class LegacyImportConfig extends Command
                 self::OPTION_WEBSITE,
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Website code to take the key from, when websites use different keys'
+                'Website code to import; needed when the legacy integration is on for more than one website'
             )
             ->addOption(
                 self::OPTION_DISABLE_LEGACY_CATALOG,
@@ -109,60 +106,49 @@ class LegacyImportConfig extends Command
             ];
         }
 
-        if ($onlyWebsite !== '' && !in_array($onlyWebsite, array_column($legacy, 'code'), true)) {
-            $output->writeln(sprintf('<error>Website "%s" does not exist.</error>', $onlyWebsite));
+        $target = $this->targetWebsite($legacy, $onlyWebsite, $output);
+        if ($target === null) {
+            return Command::FAILURE;
+        }
+        $key = $legacy[$target]['key'];
+        if ($key === '') {
+            $output->writeln(sprintf(
+                '<error>Website "%s" has no legacy API key (centraliza/general/api_key). Nothing to import.</error>',
+                $legacy[$target]['code']
+            ));
 
             return Command::FAILURE;
         }
 
-        $keys = [];
-        foreach ($legacy as $website) {
-            if ($website['key'] !== '' && ($onlyWebsite === '' || $website['code'] === $onlyWebsite)) {
-                $keys[$website['key']] = true;
-            }
-        }
-        if ($keys === []) {
-            $output->writeln('<error>No website has a legacy API key (centraliza/general/api_key). Nothing to import.</error>');
+        $others = array_values(array_diff($this->settings->websitesTurnedOn(), [$target]));
+        if ($others !== []) {
+            $output->writeln(sprintf(
+                '<error>Centraliza Connector already reports website "%s", and it reports one website at a time. Turn it off there first.</error>',
+                $legacy[$others[0]]['code'] ?? (string)$others[0]
+            ));
 
             return Command::FAILURE;
-        }
-        if (count($keys) > 1) {
-            $output->writeln(
-                '<error>Websites use different legacy API keys and Centraliza Connector holds one connection. '
-                . 'Pick one with --website=<code>.</error>'
-            );
-
-            return Command::FAILURE;
-        }
-        $key = (string)array_key_first($keys);
-
-        // Websites where the legacy integration was live with this key. Only these are turned on and nothing
-        // is turned off, so running the command again never undoes the first run.
-        $enable = [];
-        foreach ($legacy as $websiteId => $website) {
-            if ($website['enabled'] && $website['key'] === $key) {
-                $enable[] = $websiteId;
-            }
         }
 
         $table = new Table($output);
-        $table->setHeaders(['Website', 'Legacy enabled', 'Legacy key', 'Connector enabled']);
+        $table->setHeaders(['Website', 'Legacy enabled', 'Legacy key', 'Imported']);
         foreach ($legacy as $websiteId => $website) {
             $table->addRow([
                 $website['code'],
                 $website['enabled'] ? 'yes' : 'no',
                 $website['key'] === '' ? '-' : $this->fingerprint($website['key']),
-                in_array($websiteId, $enable, true) ? 'yes (set now)' : 'unchanged',
+                $websiteId === $target ? 'yes' : 'no',
             ]);
         }
         $table->render();
 
-        $writes = [[self::API_KEY, $this->encryptor->encrypt($key), ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 0]];
-        foreach ($enable as $websiteId) {
-            $writes[] = [self::ENABLED, '1', ScopeInterface::SCOPE_WEBSITES, $websiteId];
+        $writes = [[self::API_KEY, $this->encryptor->encrypt($key), ScopeInterface::SCOPE_WEBSITES, $target]];
+        // Only turned on where the legacy integration was on; nothing is turned off, so a second run undoes nothing.
+        if ($legacy[$target]['enabled']) {
+            $writes[] = [Settings::XML_PATH_ENABLED, '1', ScopeInterface::SCOPE_WEBSITES, $target];
         }
         if ($connectionId !== '') {
-            $writes[] = [self::CONNECTION_ID, $connectionId, ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 0];
+            $writes[] = [self::CONNECTION_ID, $connectionId, ScopeInterface::SCOPE_WEBSITES, $target];
         }
         if ($input->getOption(self::OPTION_DISABLE_LEGACY_CATALOG)) {
             foreach ($this->legacyCatalogScopes() as [$path, $scope, $scopeId]) {
@@ -185,20 +171,56 @@ class LegacyImportConfig extends Command
         }
         $this->cacheTypes->cleanType(ConfigCache::TYPE_IDENTIFIER);
 
-        if ($enable === []) {
-            $output->writeln('<comment>The legacy integration is off on every website, so no website was enabled here.</comment>');
+        if (!$legacy[$target]['enabled']) {
+            $output->writeln('<comment>The legacy integration is off on this website, so it was not turned on here.</comment>');
         }
-        if ($connectionId === '' && trim((string)$this->scopeConfig->getValue(self::CONNECTION_ID)) === '') {
+        if ($connectionId === '' && trim((string)$this->settings->get(self::CONNECTION_ID, $target)) === '') {
             $output->writeln('<comment>Production channel ID is still empty: set it with --connection-id before going live.</comment>');
         }
         $output->writeln(sprintf(
-            '<info>Done. Environment is "%s" and mode is "%s"; switch with bin/magento config:set %s live.</info>',
-            (string)$this->scopeConfig->getValue(self::ENVIRONMENT),
-            (string)$this->scopeConfig->getValue(self::MODE),
+            '<info>Done. Website "%s" uses environment "%s" in mode "%s"; switch with bin/magento config:set --scope=websites --scope-code=%s %s live.</info>',
+            $legacy[$target]['code'],
+            $this->settings->environment($target),
+            (string)$this->settings->get(self::MODE, $target),
+            $legacy[$target]['code'],
             self::MODE
         ));
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * The website named with --website, or the only one where the legacy integration is on with a key.
+     *
+     * @param array<int, array{code: string, enabled: bool, key: string}> $legacy
+     */
+    private function targetWebsite(array $legacy, string $code, OutputInterface $output): ?int
+    {
+        if ($code !== '') {
+            foreach ($legacy as $websiteId => $website) {
+                if ($website['code'] === $code) {
+                    return $websiteId;
+                }
+            }
+            $output->writeln(sprintf('<error>Website "%s" does not exist.</error>', $code));
+
+            return null;
+        }
+
+        $candidates = array_keys(array_filter($legacy, static fn (array $website): bool => $website['enabled'] && $website['key'] !== ''));
+        if (count($candidates) === 1) {
+            return (int)$candidates[0];
+        }
+        if ($candidates === []) {
+            $output->writeln('<error>No website has the legacy integration on with an API key. Name one with --website=<code>.</error>');
+        } else {
+            $output->writeln(sprintf(
+                '<error>The legacy integration is on for %s, and Centraliza Connector reports one website at a time. Pick one with --website=<code>.</error>',
+                implode(', ', array_map(static fn (int $id): string => $legacy[$id]['code'], $candidates))
+            ));
+        }
+
+        return null;
     }
 
     private function legacyKey(int $websiteId): string

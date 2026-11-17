@@ -13,7 +13,7 @@ use Centraliza\Connector\Messaging\Model\LegacyModules;
 use Centraliza\Connector\Messaging\Model\ResourceModel\RateLimit;
 use GuzzleHttp\Psr7\UriResolver;
 use InvalidArgumentException;
-use Magento\Framework\App\Config\ScopeConfigInterface;
+use Centraliza\Connector\Infra\Config\Settings;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -80,13 +80,13 @@ class QuotaReservation implements QuotaReservationInterface
 
     /**
      * @param RateLimit $rateLimitResource
-     * @param ScopeConfigInterface $scopeConfig
+     * @param Settings $settings
      * @param LoggerInterface $logger
      * @param LegacyModules $legacyModules
      */
     public function __construct(
         private readonly RateLimit $rateLimitResource,
-        private readonly ScopeConfigInterface $scopeConfig,
+        private readonly Settings $settings,
         private readonly LoggerInterface $logger,
         private readonly LegacyModules $legacyModules
     ) {
@@ -292,7 +292,8 @@ class QuotaReservation implements QuotaReservationInterface
     }
 
     /**
-     * Requests per minute per key, or null when the local limit is off.
+     * Requests per minute per key, or null when the local limit is off. Read at the reporting website's scope,
+     * like the key it limits.
      *
      * While the legacy Centraliza_Base is enabled it counts in the same table against its fixed 60: a higher
      * limit here would let the connection events spend what its messages wait for, so 60 holds until then.
@@ -301,7 +302,7 @@ class QuotaReservation implements QuotaReservationInterface
      */
     public function getLimit(): ?int
     {
-        $configured = $this->scopeConfig->getValue(self::PATH_REQUEST_LIMIT);
+        $configured = $this->settings->get(self::PATH_REQUEST_LIMIT);
         if ($configured === null || trim((string) $configured) === '') {
             $limit = self::DEFAULT_LIMIT;
         } else {
@@ -344,7 +345,7 @@ class QuotaReservation implements QuotaReservationInterface
      */
     private function getBulkFloor(int $limit): int
     {
-        $floor = (int) $this->scopeConfig->getValue(self::PATH_BULK_QUOTA_FLOOR);
+        $floor = (int) $this->settings->get(self::PATH_BULK_QUOTA_FLOOR);
 
         // CLI or SQL writes skip the admin validation, and the limit can be lowered after the floor was saved.
         if ($floor < self::MIN_BULK_FLOOR || $floor >= $limit) {
