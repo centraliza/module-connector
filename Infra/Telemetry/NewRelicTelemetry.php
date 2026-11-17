@@ -46,6 +46,7 @@ class NewRelicTelemetry implements TelemetryInterface
         return $this->common ??= [
             'storeHost' => $this->settings->reportingHost(),
             'mode' => $this->settings->isLive() ? Settings::MODE_LIVE : Settings::MODE_DRY_RUN,
+            'environment' => $this->settings->environment(),
         ];
     }
 }

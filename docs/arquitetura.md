@@ -31,7 +31,7 @@ flowchart LR
         REST["REST API do Magento<br/>token de integração"]
     end
 
-    CEN(["Centraliza<br/>api.centraliza.ai/v1"])
+    CEN(["Centraliza<br/>api.centraliza.ai/v1 ou api.centraliza.dev/v1"])
 
     ADM --> ENT
     MKT --> ENT
@@ -435,37 +435,42 @@ Configuração em Stores > Configuration > Services > Centraliza Connector:
 |---|---|---|
 | `centraliza_connector/general/enabled` | store view | liga a captura; o website é coberto se alguma store view dele estiver ligada |
 | `centraliza_connector/general/mode` | global | `dry_run` (padrão) ou `live` |
-| `centraliza_connector/general/api_key` | global | chave `csk_`, gravada com `Backend\Encrypted` e marcada como sensível |
-| `centraliza_connector/general/connection_id` | global | UUID da conexão Magento no Centraliza |
+| `centraliza_connector/general/environment` | global | `production` (app.centraliza.ai, padrão) ou `staging` (app.centraliza.dev); escolhe qual trio abaixo vale |
+| `centraliza_connector/general/api_key_{production,staging}` | global | chave `csk_` de cada ambiente, gravada com `Backend\Encrypted` e marcada como sensível; o admin mostra só a do ambiente selecionado |
+| `centraliza_connector/general/connection_id_{production,staging}` | global | channel ID (UUID da conexão Magento) de cada ambiente |
 | `centraliza_connector/carts/guests` | website | reporta carrinhos sem cliente; padrão Não |
 | `centraliza_connector/delivery/max_attempts` | global | quantas vezes um evento é enviado antes de ir para a quarentena; padrão 5 |
-| `centraliza_connector/general/base_url` | global, sem campo no admin | padrão `https://api.centraliza.ai` |
+| `centraliza_connector/general/base_url_{production,staging}` | global, sem campo no admin | `https://api.centraliza.ai` e `https://api.centraliza.dev` |
 
-Em modo `live` sem chave ou sem `connection_id`, nada é enviado: o evento é retido como em um `401`, sem gastar tentativa.
+Em modo `live` sem chave ou sem channel ID no ambiente selecionado, nada é enviado: o evento é retido como em um `401`, sem gastar tentativa. Trocar de ambiente não migra a fila: eventos ainda não entregues saem para o ambiente novo.
+
+`environment`, `mode` e as URLs são marcados como específicos de ambiente (vão para o `env.php` num `app:config:dump`), para HML apontar para staging e produção para produção sem conflito no `config.php`.
 
 ### Migração dos módulos antigos
 
-Os módulos antigos (`Centraliza_Base`, `Centraliza_Notification`, `Centraliza_Sales`) continuam instalados e ativos no `config.php`, e são desligados por configuração. Desabilitá-los com `module:disable` faz o `setup:upgrade` seguinte apagar as tabelas deles: a whitelist do declarative schema vem de todos os módulos registrados, mas a declaração só dos ativos.
+Os módulos antigos (`Centraliza_Base`, `Centraliza_Notification`, `Centraliza_Sales`) continuam instalados e ativos: status de pedido por WhatsApp, carrinho abandonado, link de recuperação de carrinho e callback de entrega ainda vivem neles. Este módulo substitui só as notificações de catálogo. Desabilitá-los com `module:disable` faria o `setup:upgrade` seguinte apagar as tabelas deles: a whitelist do declarative schema vem de todos os módulos registrados, mas a declaração só dos ativos.
+
+Os antigos falam só com produção (`https://api.centraliza.ai/v1/`, fixo no código) e respeitam o limite de requisições por chave sem enxergar o tráfego deste módulo. Com a mesma chave nos dois, uma rajada de catálogo daqui consome a cota das mensagens de WhatsApp.
 
 ```bash
 bin/magento centraliza:legacy:import-config --dry-run
-bin/magento centraliza:legacy:import-config --connection-id=<uuid> --disable-legacy
+bin/magento centraliza:legacy:import-config --connection-id=<uuid> --disable-legacy-catalog
 ```
 
 | O que | De | Para |
 |---|---|---|
-| chave da API | `centraliza/general/api_key` (por website, criptografada) | `centraliza_connector/general/api_key` (global, recriptografada) |
+| chave da API | `centraliza/general/api_key` (por website, criptografada) | `centraliza_connector/general/api_key_production` (global, recriptografada) |
 | websites ligados | websites com `centraliza/general/enabled` = 1 e essa chave | `centraliza_connector/general/enabled` = 1 no escopo do website |
-| `connection_id` | não existe nos antigos | `--connection-id` |
-| fluxos antigos (`--disable-legacy`) | `centraliza/general/enabled`, `notification/general/enabled`, `order_notification/enabled`, `abandoned_cart/enabled`, `cart_redirect/enabled` | `0` no escopo default e em todo escopo que tenha valor próprio |
+| channel ID | não existe nos antigos | `--connection-id` → `connection_id_production` |
+| catálogo antigo (`--disable-legacy-catalog`) | `centraliza/notification/general/enabled` | `0` no escopo default e em todo escopo que tenha valor próprio |
 
-O comando nunca desliga um website no conector e não mexe no `mode`. Rodar de novo depois do `--disable-legacy` não desfaz nada. Se os websites tiverem chaves diferentes, ele para e pede `--website=<code>`: o conector tem uma conexão só. A chave nunca é impressa, só um fingerprint `sha256:` de 8 caracteres.
+O comando nunca desliga um website no conector e não mexe no `mode` nem no `environment`. Rodar de novo não desfaz nada. Se os websites tiverem chaves diferentes, ele para e pede `--website=<code>`: o conector tem uma conexão só. A chave nunca é impressa, só um fingerprint `sha256:` de 8 caracteres.
 
 ## Observabilidade (New Relic)
 
 O módulo registra três eventos customizados pela porta `Core\Port\TelemetryInterface`. O adaptador `Infra\Telemetry\NewRelicTelemetry` usa `newrelic_record_custom_event`; sem a extensão do agente carregada, nada acontece. Nenhum evento leva o `record`, que pode conter dado pessoal.
 
-Todo evento leva também `storeHost` (host da store view que reporta) e `mode` (`live` ou `dry_run`). O nome de aplicação do New Relic é compartilhado entre lojas, então toda consulta deve filtrar ou agrupar por `storeHost`.
+Todo evento leva também `storeHost` (host da store view que reporta), `mode` (`live` ou `dry_run`) e `environment` (`production` ou `staging`). O nome de aplicação do New Relic é compartilhado entre lojas, então toda consulta deve filtrar ou agrupar por `storeHost`.
 
 | Evento | Quando | Atributos |
 |---|---|---|

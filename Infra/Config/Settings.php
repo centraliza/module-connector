@@ -12,10 +12,12 @@ use Magento\Store\Model\StoreManagerInterface;
 class Settings implements SettingsInterface
 {
     private const XML_PATH_ENABLED = 'centraliza_connector/general/enabled';
-    private const XML_PATH_CONNECTION_ID = 'centraliza_connector/general/connection_id';
     private const XML_PATH_MODE = 'centraliza_connector/general/mode';
-    private const XML_PATH_API_KEY = 'centraliza_connector/general/api_key';
-    private const XML_PATH_BASE_URL = 'centraliza_connector/general/base_url';
+    private const XML_PATH_ENVIRONMENT = 'centraliza_connector/general/environment';
+    /** Each environment has its own key, channel and API host: the paths end in _production or _staging. */
+    private const XML_PATH_CONNECTION_ID = 'centraliza_connector/general/connection_id_';
+    private const XML_PATH_API_KEY = 'centraliza_connector/general/api_key_';
+    private const XML_PATH_BASE_URL = 'centraliza_connector/general/base_url_';
     private const XML_PATH_GUEST_CARTS = 'centraliza_connector/carts/guests';
     private const XML_PATH_TELEMETRY_LOG = 'centraliza_connector/general/telemetry_log';
     private const XML_PATH_MAX_ATTEMPTS = 'centraliza_connector/delivery/max_attempts';
@@ -24,6 +26,9 @@ class Settings implements SettingsInterface
 
     public const MODE_DRY_RUN = 'dry_run';
     public const MODE_LIVE = 'live';
+
+    public const ENV_PRODUCTION = 'production';
+    public const ENV_STAGING = 'staging';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -72,9 +77,22 @@ class Settings implements SettingsInterface
         return (string)parse_url((string)$this->scopeConfig->getValue('web/secure/base_url', ScopeInterface::SCOPE_STORE, $storeId), PHP_URL_HOST);
     }
 
+    /**
+     * Which Centraliza the store talks to: production (app.centraliza.ai) or staging (app.centraliza.dev).
+     */
+    public function environment(): string
+    {
+        return (string)$this->scopeConfig->getValue(self::XML_PATH_ENVIRONMENT) === self::ENV_STAGING
+            ? self::ENV_STAGING
+            : self::ENV_PRODUCTION;
+    }
+
+    /**
+     * The channel (connection) id of the selected environment.
+     */
     public function connectionId(): string
     {
-        return trim((string)$this->scopeConfig->getValue(self::XML_PATH_CONNECTION_ID));
+        return trim((string)$this->scopeConfig->getValue(self::XML_PATH_CONNECTION_ID . $this->environment()));
     }
 
     /**
@@ -106,15 +124,15 @@ class Settings implements SettingsInterface
     }
 
     /**
-     * The workspace key (csk_...), decrypted; empty when not configured.
+     * The workspace key (csk_...) of the selected environment, decrypted; empty when not configured.
      */
     public function apiKey(): string
     {
-        return trim((string)$this->scopeConfig->getValue(self::XML_PATH_API_KEY));
+        return trim((string)$this->scopeConfig->getValue(self::XML_PATH_API_KEY . $this->environment()));
     }
 
     public function baseUrl(): string
     {
-        return rtrim(trim((string)$this->scopeConfig->getValue(self::XML_PATH_BASE_URL)), '/');
+        return rtrim(trim((string)$this->scopeConfig->getValue(self::XML_PATH_BASE_URL . $this->environment())), '/');
     }
 }

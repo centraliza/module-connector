@@ -117,11 +117,14 @@
     <type name="Magento\Config\Model\Config\TypePool">
         <arguments>
             <argument name="sensitive" xsi:type="array">
-                <item name="centraliza_connector/general/api_key" xsi:type="string">1</item>
+                <item name="centraliza_connector/general/api_key_production" xsi:type="string">1</item>
+                <item name="centraliza_connector/general/api_key_staging" xsi:type="string">1</item>
             </argument>
             <argument name="environment" xsi:type="array">
                 <item name="centraliza_connector/general/mode" xsi:type="string">1</item>
-                <item name="centraliza_connector/general/base_url" xsi:type="string">1</item>
+                <item name="centraliza_connector/general/environment" xsi:type="string">1</item>
+                <item name="centraliza_connector/general/base_url_production" xsi:type="string">1</item>
+                <item name="centraliza_connector/general/base_url_staging" xsi:type="string">1</item>
             </argument>
         </arguments>
     </type>

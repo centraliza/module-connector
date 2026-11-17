@@ -5,10 +5,14 @@
             <general>
                 <enabled>0</enabled>
                 <mode>dry_run</mode>
-                <api_key backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
-                <connection_id/>
+                <environment>production</environment>
+                <api_key_production backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
+                <connection_id_production/>
+                <base_url_production>https://api.centraliza.ai</base_url_production>
+                <api_key_staging backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
+                <connection_id_staging/>
+                <base_url_staging>https://api.centraliza.dev</base_url_staging>
                 <telemetry_log>0</telemetry_log>
-                <base_url>https://api.centraliza.ai</base_url>
             </general>
             <carts>
                 <guests>0</guests>

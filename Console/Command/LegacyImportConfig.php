@@ -20,34 +20,34 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
 /**
- * Moves the connection of the legacy Centraliza modules (Centraliza_Base and friends) to this one:
- * the API key, and the websites the legacy integration was on. Optionally turns the legacy flows off.
+ * Copies the connection of the legacy Centraliza modules (Centraliza_Base and friends) to this one:
+ * the API key, into the production slot (the legacy modules only talk to production), and the websites
+ * the legacy integration was on. Optionally turns off the legacy catalog notifications, the one legacy
+ * feature this module replaces.
  *
- * The legacy modules stay installed and enabled: disabling them in config.php would make the next
- * setup:upgrade drop their tables, because the schema whitelist still lists them.
+ * The legacy modules stay installed and enabled: order status messages, abandoned cart and the cart
+ * recovery link still live there. Disabling them in config.php would also make the next setup:upgrade
+ * drop their tables, because the schema whitelist still lists them.
  */
 class LegacyImportConfig extends Command
 {
     private const OPTION_CONNECTION_ID = 'connection-id';
     private const OPTION_WEBSITE = 'website';
-    private const OPTION_DISABLE_LEGACY = 'disable-legacy';
+    private const OPTION_DISABLE_LEGACY_CATALOG = 'disable-legacy-catalog';
     private const OPTION_DRY_RUN = 'dry-run';
 
     private const LEGACY_ENABLED = 'centraliza/general/enabled';
     private const LEGACY_API_KEY = 'centraliza/general/api_key';
 
-    /** Every switch that makes a legacy module send something. The first one gates the rest at runtime. */
-    private const LEGACY_SWITCHES = [
-        self::LEGACY_ENABLED,
+    /** Legacy catalog notifications (product, price, inventory): replaced by this module's streams. */
+    private const LEGACY_CATALOG_SWITCHES = [
         'centraliza/notification/general/enabled',
-        'centraliza/order_notification/enabled',
-        'centraliza/abandoned_cart/enabled',
-        'centraliza/cart_redirect/enabled',
     ];
 
     private const ENABLED = 'centraliza_connector/general/enabled';
-    private const API_KEY = 'centraliza_connector/general/api_key';
-    private const CONNECTION_ID = 'centraliza_connector/general/connection_id';
+    private const API_KEY = 'centraliza_connector/general/api_key_production';
+    private const CONNECTION_ID = 'centraliza_connector/general/connection_id_production';
+    private const ENVIRONMENT = 'centraliza_connector/general/environment';
     private const MODE = 'centraliza_connector/general/mode';
 
     public function __construct(
@@ -64,12 +64,12 @@ class LegacyImportConfig extends Command
     protected function configure(): void
     {
         $this->setName('centraliza:legacy:import-config')
-            ->setDescription('Copies the API key and enabled websites of the legacy Centraliza modules to Centraliza Connector')
+            ->setDescription('Copies the API key and enabled websites of the legacy Centraliza modules to Centraliza Connector (production)')
             ->addOption(
                 self::OPTION_CONNECTION_ID,
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Connection ID (Centraliza > Settings > Channels); the legacy modules have none'
+                'Production channel ID (app.centraliza.ai > Settings > Channels); the legacy modules have none'
             )
             ->addOption(
                 self::OPTION_WEBSITE,
@@ -78,10 +78,10 @@ class LegacyImportConfig extends Command
                 'Website code to take the key from, when websites use different keys'
             )
             ->addOption(
-                self::OPTION_DISABLE_LEGACY,
+                self::OPTION_DISABLE_LEGACY_CATALOG,
                 null,
                 InputOption::VALUE_NONE,
-                'Also turn off order status, abandoned cart, cart redirect and catalog of the legacy modules'
+                'Also turn off the legacy catalog notifications; order status, abandoned cart and cart recovery stay on'
             )
             ->addOption(self::OPTION_DRY_RUN, null, InputOption::VALUE_NONE, 'Show what would change, write nothing');
     }
@@ -136,8 +136,8 @@ class LegacyImportConfig extends Command
         }
         $key = (string)array_key_first($keys);
 
-        // Websites where the legacy integration was live with this key. Only these are turned on; nothing is
-        // turned off, so running again after --disable-legacy leaves the connector as the first run set it.
+        // Websites where the legacy integration was live with this key. Only these are turned on and nothing
+        // is turned off, so running the command again never undoes the first run.
         $enable = [];
         foreach ($legacy as $websiteId => $website) {
             if ($website['enabled'] && $website['key'] === $key) {
@@ -164,8 +164,8 @@ class LegacyImportConfig extends Command
         if ($connectionId !== '') {
             $writes[] = [self::CONNECTION_ID, $connectionId, ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 0];
         }
-        if ($input->getOption(self::OPTION_DISABLE_LEGACY)) {
-            foreach ($this->legacySwitchScopes() as [$path, $scope, $scopeId]) {
+        if ($input->getOption(self::OPTION_DISABLE_LEGACY_CATALOG)) {
+            foreach ($this->legacyCatalogScopes() as [$path, $scope, $scopeId]) {
                 $writes[] = [$path, '0', $scope, $scopeId];
             }
         }
@@ -189,10 +189,11 @@ class LegacyImportConfig extends Command
             $output->writeln('<comment>The legacy integration is off on every website, so no website was enabled here.</comment>');
         }
         if ($connectionId === '' && trim((string)$this->scopeConfig->getValue(self::CONNECTION_ID)) === '') {
-            $output->writeln('<comment>Connection ID is still empty: set it with --connection-id before going live.</comment>');
+            $output->writeln('<comment>Production channel ID is still empty: set it with --connection-id before going live.</comment>');
         }
         $output->writeln(sprintf(
-            '<info>Done. Mode is "%s"; switch with bin/magento config:set %s live.</info>',
+            '<info>Done. Environment is "%s" and mode is "%s"; switch with bin/magento config:set %s live.</info>',
+            (string)$this->scopeConfig->getValue(self::ENVIRONMENT),
             (string)$this->scopeConfig->getValue(self::MODE),
             self::MODE
         ));
@@ -219,16 +220,16 @@ class LegacyImportConfig extends Command
      *
      * @return list<array{0: string, 1: string, 2: int}>
      */
-    private function legacySwitchScopes(): array
+    private function legacyCatalogScopes(): array
     {
         $connection = $this->resource->getConnection();
         $select = $connection->select()
             ->from($this->resource->getTableName('core_config_data'), ['path', 'scope', 'scope_id'])
-            ->where('path IN (?)', self::LEGACY_SWITCHES)
+            ->where('path IN (?)', self::LEGACY_CATALOG_SWITCHES)
             ->where('scope <> ?', ScopeConfigInterface::SCOPE_TYPE_DEFAULT);
 
         $scopes = [];
-        foreach (self::LEGACY_SWITCHES as $path) {
+        foreach (self::LEGACY_CATALOG_SWITCHES as $path) {
             $scopes[] = [$path, ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 0];
         }
         foreach ($connection->fetchAll($select) as $row) {

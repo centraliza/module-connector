@@ -20,7 +20,7 @@ class NewRelicTelemetryTest extends TestCase
         $this->telemetry(true)->event('CentralizaDelivery', ['stream' => 'orders', 'sendMs' => null, 'attempts' => 0]);
 
         self::assertSame(
-            [['CentralizaDelivery', ['stream' => 'orders', 'attempts' => 0, 'storeHost' => 'www.loja.example', 'mode' => 'live']]],
+            [['CentralizaDelivery', ['stream' => 'orders', 'attempts' => 0, 'storeHost' => 'www.loja.example', 'mode' => 'live', 'environment' => 'staging']]],
             $this->recorded
         );
     }
@@ -59,6 +59,7 @@ class NewRelicTelemetryTest extends TestCase
         $settings = $this->createStub(Settings::class);
         $settings->method('reportingHost')->willReturn('www.loja.example');
         $settings->method('isLive')->willReturn(true);
+        $settings->method('environment')->willReturn('staging');
 
         return $settings;
     }
