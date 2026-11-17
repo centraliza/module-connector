@@ -8,6 +8,8 @@ enum Action: string
 {
     /** Done. */
     case Delivered = 'delivered';
+    /** Nothing to send: the record no longer exists, and its delete is reported on its own. */
+    case Skipped = 'skipped';
     /** Try again after a delay; the attempt counts. */
     case Retry = 'retry';
     /** Wait without spending an attempt: the problem is the key or the route, not the event. */

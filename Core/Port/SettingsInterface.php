@@ -19,6 +19,12 @@ interface SettingsInterface
     public function enabledWebsiteIds(): array;
 
     /**
+     * The store view whose values are sent for records that vary by store view:
+     * the first one that reports. Null when none does.
+     */
+    public function reportingStoreId(): ?int;
+
+    /**
      * The id of the Magento connection in Centraliza (Settings > Channels); empty when not configured.
      */
     public function connectionId(): string;

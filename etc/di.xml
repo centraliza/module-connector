@@ -4,6 +4,7 @@
     <preference for="Centraliza\Connector\Core\Port\CircuitStoreInterface" type="Centraliza\Connector\Infra\Persistence\CircuitStore"/>
     <preference for="Centraliza\Connector\Core\Port\RetryStoreInterface" type="Centraliza\Connector\Infra\Persistence\RetryStore"/>
     <preference for="Centraliza\Connector\Core\Port\QuarantineStoreInterface" type="Centraliza\Connector\Infra\Persistence\QuarantineStore"/>
+    <preference for="Centraliza\Connector\Core\Port\RecordReaderInterface" type="Centraliza\Connector\Entity\RecordReader"/>
     <preference for="Centraliza\Connector\Core\Policy\DeliveryPolicyInterface" type="Centraliza\Connector\Core\Policy\ConnectionEventPolicy"/>
     <preference for="Centraliza\Connector\Core\Port\ChangeRecorderInterface" type="Centraliza\Connector\Capture\Collector"/>
     <preference for="Centraliza\Connector\Core\Port\EventPublisherInterface" type="Centraliza\Connector\Infra\Queue\GuardedPublisher"/>
@@ -76,6 +77,15 @@
                         <item name="source_code" xsi:type="string">source_code</item>
                     </item>
                 </item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!-- One reader per stream whose events carry the record. A stream with no reader is reported with its key only. -->
+    <type name="Centraliza\Connector\Entity\RecordReader">
+        <arguments>
+            <argument name="readers" xsi:type="array">
+                <item name="products" xsi:type="object">Centraliza\Connector\Entity\Product\ProductReader</item>
             </argument>
         </arguments>
     </type>

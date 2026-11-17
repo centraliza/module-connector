@@ -17,6 +17,7 @@ use Centraliza\Connector\Core\Policy\ConnectionEventPolicy;
 use Centraliza\Connector\Core\Port\CircuitStoreInterface;
 use Centraliza\Connector\Core\Port\ClockInterface;
 use Centraliza\Connector\Core\Port\QuarantineStoreInterface;
+use Centraliza\Connector\Core\Port\RecordReaderInterface;
 use Centraliza\Connector\Core\Port\RetryStoreInterface;
 use Centraliza\Connector\Core\Port\SettingsInterface;
 use Centraliza\Connector\Core\Port\TransportInterface;
@@ -35,6 +36,14 @@ class DeliverEventTest extends TestCase
     private array $quarantined = [];
 
     private int $sent = 0;
+
+    /** @var array<int, array<string, mixed>> */
+    private array $sentBodies = [];
+
+    /** @var array<string, mixed>|null|false what the store holds for the record; false when it cannot be read */
+    private array|null|false $record = ['sku' => 'A', 'name' => 'Luva'];
+
+    private int $reads = 0;
 
     public function testAnAcceptedEventLeavesNothingBehind(): void
     {
@@ -90,16 +99,69 @@ class DeliverEventTest extends TestCase
         $this->held = [];
         $this->sent = 0;
 
+        $this->reads = 0;
+
         self::assertSame(Action::Postpone, $service->deliver($this->event(4), 0.0));
         self::assertSame(0, $this->sent);
+        self::assertSame(0, $this->reads);
         self::assertSame(4, $this->held[0][2]);
         self::assertSame('Circuit open.', $this->held[0][4]);
     }
 
-    private function event(int $attempts): HeldEvent
+    public function testTheRecordIsReadAtSendTimeAndTravelsNextToTheKey(): void
+    {
+        $this->service(Outcome::of(OutcomeKind::Accepted))->deliver($this->event(0), 0.0);
+
+        self::assertSame(['sku' => 'A', 'record' => ['sku' => 'A', 'name' => 'Luva']], $this->sentBodies[0]['data']);
+    }
+
+    public function testADeleteCarriesOnlyTheKey(): void
+    {
+        $this->service(Outcome::of(OutcomeKind::Accepted))->deliver($this->event(0, EventVerb::Deleted), 0.0);
+
+        self::assertSame(['sku' => 'A'], $this->sentBodies[0]['data']);
+        self::assertSame(0, $this->reads);
+    }
+
+    public function testAnEventForARecordThatIsGoneIsSkipped(): void
+    {
+        $this->record = null;
+
+        self::assertSame(Action::Skipped, $this->service(Outcome::of(OutcomeKind::Accepted))->deliver($this->event(0), 0.0));
+        self::assertSame(0, $this->sent);
+        self::assertSame([], $this->held);
+    }
+
+    public function testARecordThatCannotBeReadSpendsAnAttemptWithoutSending(): void
+    {
+        $this->record = false;
+
+        self::assertSame(Action::Retry, $this->service(Outcome::of(OutcomeKind::Accepted))->deliver($this->event(1), 1.0));
+        self::assertSame(0, $this->sent);
+        self::assertSame(2, $this->held[0][2]);
+        self::assertStringStartsWith('unavailable Could not read the record:', $this->held[0][4]);
+    }
+
+    private function reader(): RecordReaderInterface
+    {
+        $reader = $this->createStub(RecordReaderInterface::class);
+        $reader->method('supports')->willReturn(true);
+        $reader->method('read')->willReturnCallback(function (): ?array {
+            $this->reads++;
+            if ($this->record === false) {
+                throw new \RuntimeException('database is gone');
+            }
+
+            return $this->record;
+        });
+
+        return $reader;
+    }
+
+    private function event(int $attempts, EventVerb $verb = EventVerb::Updated): HeldEvent
     {
         return new HeldEvent(
-            new ConnectionEvent('products', EventVerb::Updated, ['sku' => 'A'], 'k', '2026-11-13T12:00:00Z'),
+            new ConnectionEvent('products', $verb, ['sku' => 'A'], 'k', '2026-11-13T12:00:00Z'),
             'bulk',
             $attempts
         );
@@ -110,8 +172,9 @@ class DeliverEventTest extends TestCase
         $clock = $this->createMock(ClockInterface::class);
         $clock->method('now')->willReturn(self::NOW);
         $transport = $this->createMock(TransportInterface::class);
-        $transport->method('send')->willReturnCallback(function () use ($outcome) {
+        $transport->method('send')->willReturnCallback(function (ConnectionEvent $event) use ($outcome) {
             $this->sent++;
+            $this->sentBodies[] = $event->toRequestBody('c');
 
             return $outcome;
         });
@@ -148,7 +211,8 @@ class DeliverEventTest extends TestCase
             new ConnectionEventPolicy(new Backoff(30, 3600), $settings),
             $retry,
             $quarantine,
-            $clock
+            $clock,
+            $this->reader()
         );
     }
 }

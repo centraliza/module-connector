@@ -47,6 +47,17 @@ class Settings implements SettingsInterface
         return array_values($websiteIds);
     }
 
+    public function reportingStoreId(): ?int
+    {
+        foreach ($this->storeManager->getStores() as $store) {
+            if ($this->scopeConfig->isSetFlag(self::XML_PATH_ENABLED, ScopeInterface::SCOPE_STORE, $store->getId())) {
+                return (int)$store->getId();
+            }
+        }
+
+        return null;
+    }
+
     public function connectionId(): string
     {
         return trim((string)$this->scopeConfig->getValue(self::XML_PATH_CONNECTION_ID));

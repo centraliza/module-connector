@@ -40,6 +40,15 @@ final readonly class CircuitGate
     }
 
     /**
+     * Would a request be let through now? Unlike allow(), this never makes the
+     * caller the probe, so it is safe to ask before knowing there is something to send.
+     */
+    public function wouldAllow(string $scope): bool
+    {
+        return $this->breaker->allow($this->store->load($scope), $this->clock->now())[0];
+    }
+
+    /**
      * True when nothing is being held back. Reads the state without becoming the probe.
      */
     public function isClosed(string $scope): bool
