@@ -79,10 +79,10 @@ A documentação cita `products` (chave `sku`) e `stock` (chave `sku` + `source_
 | `products` | created, updated, deleted | `sku` | `GET /V1/products/:sku` | documentado |
 | `stock` | updated, deleted | `sku`, `source_code` | `GET /V1/inventory/source-items` | documentado |
 | `prices` | created, updated, deleted | `sku` | `GET /V1/products/:sku`, `POST /V1/products/tier-prices-information` | proposto, implementado |
-| `customers` | created, updated, deleted | `customer_id`, `email` | `GET /V1/customers/:id` (traz os endereços) | proposto |
-| `customer_groups` | created, updated, deleted | `group_id`, `code` | `GET /V1/customerGroups/:id` | proposto |
-| `orders` | created, updated | `order_id`, `increment_id` | `GET /V1/orders/:id` | proposto |
-| `carts` | created, updated, deleted | `cart_id` | `GET /V1/carts/:id` | proposto |
+| `customers` | created, updated, deleted | `customer_id`, `email` | `GET /V1/customers/:id` (traz os endereços) | proposto, implementado |
+| `customer_groups` | created, updated, deleted | `group_id`, `code` | `GET /V1/customerGroups/:id` | proposto, implementado |
+| `orders` | created, updated | `order_id`, `increment_id` | `GET /V1/orders/:id` | proposto, implementado |
+| `carts` | created, updated, deleted | `cart_id` | `GET /V1/carts/:id` | proposto, implementado |
 | `locations` | created, updated | `source_code` | `GET /V1/inventory/sources/:code` | proposto, implementado |
 
 Endereço não é stream: uma alteração de endereço gera `customers.updated`. MSI Source não tem delete, só `enabled = 0`, que sai como `locations.updated`.
@@ -110,6 +110,7 @@ flowchart TB
         QP["Queue\EventPublisher"]
         TR["Http\SwitchingTransport<br/>HttpTransport | DryRunTransport"]
         RS["Persistence\RetryStore"]
+        QS["Persistence\QuarantineStore"]
         CS["Persistence\CircuitStore"]
     end
 
@@ -139,7 +140,8 @@ flowchart TB
     DEL --> POL
     POL --> BO
     DEL --> TR
-    DEL -.->|"Retry, Postpone, Dead"| RS
+    DEL -.->|"Retry, Postpone"| RS
+    DEL -.->|"Quarantine"| QS
     CB --> CS
 ```
 
@@ -220,12 +222,23 @@ sequenceDiagram
 | `prices` | `catalog_product_delete_after` | `deleted` junto do `products.deleted` |
 | `locations` | plugin `around` em `SourceRepositoryInterface::save` | `created` ou `updated`, só quando a linha do source ou seus carriers mudam (`LocationSnapshot`) |
 | `locations` | plugin `around` em `StockSourceLinksSaveInterface` e `StockSourceLinksDeleteInterface` | `updated` quando o source é vinculado a um stock, desvinculado ou muda de prioridade |
+| `customers` | `customer_save_before` + `customer_save_after` | `created` para cliente novo. `updated` só quando o que está gravado muda: `CustomerSnapshot` compara a linha do cliente, seus atributos EAV e seus endereços antes e depois. Login, bloqueio por tentativas e token de redefinição de senha não contam |
+| `customers` | `customer_address_save_before/after`, `customer_address_delete_before/after` | `updated` do cliente dono do endereço, pela mesma comparação |
+| `customers` | `customer_delete_before` + `customer_delete_after` | `deleted`, com o e-mail e o website lidos antes do delete |
+| `customer_groups` | `customer_group_save_after`, `customer_group_delete_after` | `created`, `updated` (só quando código ou classe de imposto mudam) e `deleted` |
+| `orders` | `sales_order_save_after` | `created` para pedido novo; `updated` quando algum campo do pedido muda |
+| `orders` | `_save_after` de fatura, envio, reembolso, rastreio, comentário e endereço do pedido; `_delete_after` de rastreio | `updated` do pedido dono, mesmo quando a linha do pedido não é regravada |
+| `carts` | `sales_quote_save_after` | `created` para carrinho novo, ou quando um carrinho de visitante não reportado ganha cliente. `updated` só quando alguma coluna gravada muda (`CartDiff`); o carrinho é regravado em quase toda requisição da loja |
+| `carts` | `_save_after` de item e de endereço do carrinho; `_delete_after` de item | `updated` do carrinho, quando o item ou o endereço mudou de fato |
+| `carts` | `sales_quote_delete_after` | `deleted` |
 
 Os observers usam `_save_after` e `_delete_after`, que disparam dentro da transação. Quem garante o envio só depois do commit é o `Collector`.
 
 ### Escopo por store view
 
-`centraliza_connector/general/enabled` é lido no escopo de store view. Um website é coberto quando tem ao menos uma store view com o conector ligado. Só geram evento os produtos atribuídos a um website coberto, e o estoque dos SKUs desses produtos.
+`centraliza_connector/general/enabled` é lido no escopo de store view. Um website é coberto quando tem ao menos uma store view com o conector ligado. Só geram evento os produtos atribuídos a um website coberto, e o estoque dos SKUs desses produtos. Clientes seguem o `website_id` do cliente; pedidos e carrinhos, o website da store view em que foram feitos. Grupos de clientes e sources são globais.
+
+Carrinho de visitante só é reportado se `centraliza_connector/carts/guests` estiver ligado para o website. Desligado (padrão), o carrinho passa a ser reportado quando ganha um cliente, e esse primeiro evento sai como `carts.created`.
 
 ### O que fica sem cobertura
 
@@ -235,7 +248,12 @@ Os observers usam `_save_after` e `_delete_after`, que disparam dentro da transa
 - **Preço promocional por data:** a entrada e a saída de vigência do `special_price` não geram evento; só a gravação das datas gera.
 - **Regras de preço de catálogo e `Caravel_Wholesale`:** fora do stream `prices`, que cobre só o preço bruto.
 - **`locations` não é filtrado por website:** sources são globais e saem sempre que alguma store view reporta.
-- **Streams ainda não implementados:** `customers`, `customer_groups`, `orders`, `carts`.
+- **`customer_groups` não é filtrado por website:** grupos são globais, como os sources.
+- **Vários eventos do mesmo carrinho ou pedido na mesma requisição:** o dedup do `Collector` vale por transação. Uma requisição que grava o carrinho em duas transações gera dois `carts.updated`.
+- **Limpeza de carrinhos expirados:** o cron do Magento apaga os carrinhos um a um e cada um gera `carts.deleted`.
+- **Carrinhos criados pelo próprio Centraliza por REST:** são reportados como qualquer outro (sem supressão de eco).
+- **Clientes gravados fora do model do Magento** (importação direta em tabela): sem evento.
+- **Pedidos não têm `deleted`:** o Magento não apaga pedidos.
 
 ## 6. Sequência: entrega
 
@@ -249,6 +267,7 @@ sequenceDiagram
     participant API as Centraliza
     participant PO as ConnectionEventPolicy
     participant RS as RetryStore
+    participant QS as QuarantineStore
 
     Q->>D: {id, stream, verb, key, attempt}
     D->>CB: allow(scope)
@@ -266,8 +285,8 @@ sequenceDiagram
             Note over D: ack. Nada é gravado.
         else Retry ou Postpone
             D->>RS: guarda com attempts e next_attempt_at
-        else Dead
-            D->>RS: status = dead
+        else Quarantine
+            D->>QS: grava em centraliza_connector_quarantine
         end
     end
 ```
@@ -279,15 +298,31 @@ O handler nunca lança exceção: o `Consumer` padrão trataria como `reject` se
 | HTTP | `OutcomeKind` | `Action` | Efeito |
 |---|---|---|---|
 | 200 | `Accepted` | `Delivered` | ack |
-| 422 | `Rejected` | `Dead` | linha `dead`, visível no grid, reenvio manual |
+| 400, 422 | `Rejected` | `Quarantine` | vai direto para a quarentena: reenviar o mesmo corpo não muda a resposta |
 | 429 | `RateLimited` | `Postpone` | `next_attempt_at` = `Retry-After`; `attempts` inalterado. O breaker passa a `open` até `Retry-After` (mínimo 10 s) sem subir de nível: nenhum processo envia durante a pausa e a sonda seguinte decide |
 | 401 | `Unauthorized` | `Postpone` | breaker `key:<hash>` abre |
 | 403, 404 | `RouteRefused` | `Postpone` | breaker `route:<hash>` abre |
-| 5xx, timeout | `Unavailable` | `Retry` ou `Dead` | backoff exponencial com jitter; `Dead` em `attempts >= 8` |
+| 5xx, timeout | `Unavailable` | `Retry` ou `Quarantine` | backoff exponencial com jitter; `Quarantine` em `attempts >= max_attempts` (padrão 5) |
 
 `Cron\RetryDue` roda a cada minuto. Com o breaker fechado, republica em lotes de 500 tudo o que venceu, até esvaziar ou até 45 s de execução. Com o breaker aberto ou em sonda, republica só 5 eventos, o bastante para servir de sonda.
 
 Backoff: `min(3600, 30 * 2^(attempt-1))` segundos, distribuído entre a metade e o valor cheio. `Retry-After` do servidor prevalece quando maior.
+
+### Retry e quarentena
+
+A regra é a mesma de um job de fila com `tries` e `backoff`:
+
+1. **Falhou e ainda há tentativas:** o evento volta para a fila depois de um delay. Como a fila DB do Magento não tem entrega atrasada, o delay é a linha em `centraliza_connector_retry` (`next_attempt_at`); quando vence, `Cron\RetryDue` republica o evento no fim da fila e apaga a linha.
+2. **Estourou as tentativas (5 por padrão, configurável), ou a resposta foi `Rejected`:** o evento sai do fluxo e vai para `centraliza_connector_quarantine`, com o motivo. Nada sai da quarentena sozinho.
+3. **Uma pessoa revisa a quarentena** e decide:
+
+| Comando | Efeito |
+|---|---|
+| `bin/magento centraliza:quarantine:list [--limit=50]` | lista id, stream, verbo, chave, tentativas, motivo e data |
+| `bin/magento centraliza:quarantine:retry <ids...>` ou `--all` | republica na fila com `attempts = 0` e remove da quarentena |
+| `bin/magento centraliza:quarantine:discard <ids...>` ou `--all` | apaga sem enviar |
+
+Só `Unavailable` gasta tentativa. Breaker aberto, `429`, `401`, `403` e `404` adiam o evento sem gastar: o problema é o serviço, a chave ou a rota, não o evento. Cada entrada na quarentena gera um `warning` no log.
 
 Reenviar é seguro por dois motivos: a `idempotency_key` é a mesma em todos os retries, e o evento não carrega conteúdo, só pede que o Centraliza releia o registro.
 
@@ -357,8 +392,19 @@ erDiagram
         varchar lane
         smallint attempts
         int next_attempt_at
-        varchar status
         varchar last_error
+    }
+    centraliza_connector_quarantine {
+        int quarantine_id PK
+        char idempotency_key UK
+        varchar stream
+        varchar verb
+        varchar key_json
+        varchar occurred_at
+        varchar lane
+        smallint attempts
+        varchar reason
+        timestamp quarantined_at
     }
     centraliza_connector_circuit {
         varchar scope PK
@@ -381,7 +427,7 @@ erDiagram
     }
 ```
 
-`centraliza_connector_retry` só tem linhas de eventos que falharam, foram adiados ou morreram. Em operação normal fica vazia.
+`centraliza_connector_retry` só tem eventos esperando a próxima tentativa; `centraliza_connector_quarantine`, os que esgotaram as tentativas ou foram rejeitados. Em operação normal as duas ficam vazias.
 
 Configuração em Stores > Configuration > Services > Centraliza Connector:
 
@@ -391,9 +437,59 @@ Configuração em Stores > Configuration > Services > Centraliza Connector:
 | `centraliza_connector/general/mode` | global | `dry_run` (padrão) ou `live` |
 | `centraliza_connector/general/api_key` | global | chave `csk_`, gravada com `Backend\Encrypted` e marcada como sensível |
 | `centraliza_connector/general/connection_id` | global | UUID da conexão Magento no Centraliza |
+| `centraliza_connector/carts/guests` | website | reporta carrinhos sem cliente; padrão Não |
+| `centraliza_connector/delivery/max_attempts` | global | quantas vezes um evento é enviado antes de ir para a quarentena; padrão 5 |
 | `centraliza_connector/general/base_url` | global, sem campo no admin | padrão `https://api.centraliza.ai` |
 
 Em modo `live` sem chave ou sem `connection_id`, nada é enviado: o evento é retido como em um `401`, sem gastar tentativa.
+
+## Observabilidade (New Relic)
+
+O módulo registra três eventos customizados pela porta `Core\Port\TelemetryInterface`. O adaptador `Infra\Telemetry\NewRelicTelemetry` usa `newrelic_record_custom_event`; sem a extensão do agente carregada, nada acontece. Nenhum evento leva o `record`, que pode conter dado pessoal.
+
+Todo evento leva também `storeHost` (host da store view que reporta) e `mode` (`live` ou `dry_run`). O nome de aplicação do New Relic é compartilhado entre lojas, então toda consulta deve filtrar ou agrupar por `storeHost`.
+
+| Evento | Quando | Atributos |
+|---|---|---|
+| `CentralizaDelivery` | um por evento tirado da fila | `stream`, `verb`, `lane`, `action` (`delivered`, `retry`, `postpone`, `quarantine`, `skipped`), `outcome` (`accepted`, `rejected`, `rate_limited`, `unauthorized`, `route_refused`, `unavailable`, `circuit_open`, `record_gone`, `record_unreadable`), `detail` (até 200 caracteres, ex. `HTTP 503`), `attempts` (falhas anteriores), `readMs` (leitura do registro), `sendMs` (chamada HTTP), `lagSeconds` (da mudança na loja até agora) |
+| `CentralizaCircuit` | a cada mudança de estado do circuit breaker | `scope`, `from`, `to`, `level`, `openSeconds` |
+| `CentralizaHealth` | a cada minuto, pelo cron `centraliza_connector_report_health` | `circuit`, `circuitLevel`, `held` (aguardando nova tentativa), `heldOldestSeconds`, `quarantined`, `waitingRealtime` e `waitingBulk` (só com fila DB; com RabbitMQ a profundidade vem do broker) |
+
+O consumer é um processo PHP sem fim, e o agente só envia o que juntou quando uma transação termina. Por isso `Infra\Queue\Consumer` abre uma transação de background por mensagem (`Centraliza/deliver`) e a encerra ao final.
+
+### Consultas para painel
+
+```sql
+-- Volume por resultado
+SELECT count(*) FROM CentralizaDelivery WHERE storeHost = 'www.epizeus.com.br' FACET action TIMESERIES
+
+-- Taxa de erro de envio
+SELECT percentage(count(*), WHERE outcome NOT IN ('accepted', 'record_gone')) FROM CentralizaDelivery WHERE storeHost = 'www.epizeus.com.br' AND sendMs IS NOT NULL TIMESERIES
+
+-- Latência do Centraliza e custo de leitura do registro, por stream
+SELECT percentile(sendMs, 50, 95), percentile(readMs, 50, 95) FROM CentralizaDelivery WHERE storeHost = 'www.epizeus.com.br' FACET stream
+
+-- Atraso da mudança até a entrega
+SELECT percentile(lagSeconds, 50, 95, 99) FROM CentralizaDelivery WHERE storeHost = 'www.epizeus.com.br' AND action = 'delivered' TIMESERIES
+
+-- Fila, retidos e quarentena
+SELECT latest(waitingRealtime), latest(waitingBulk), latest(held), latest(quarantined) FROM CentralizaHealth WHERE storeHost = 'www.epizeus.com.br' TIMESERIES
+```
+
+### Alertas (destino: Caravel)
+
+As condições são criadas no New Relic, em uma policy com notificação para a Caravel. O módulo não as cria.
+
+| Alerta | Condição NRQL | Limiar sugerido |
+|---|---|---|
+| Circuito aberto | `SELECT count(*) FROM CentralizaHealth WHERE circuit != 'closed' FACET storeHost` | > 0 por 10 min |
+| Evento em quarentena | `SELECT latest(quarantined) FROM CentralizaHealth FACET storeHost` | > 0 |
+| Chave ou rota recusada | `SELECT count(*) FROM CentralizaDelivery WHERE outcome IN ('unauthorized', 'route_refused') FACET storeHost` | > 0 por 5 min |
+| Fila parada | `SELECT latest(waitingRealtime) + latest(waitingBulk) FROM CentralizaHealth FACET storeHost` | > 1000 por 15 min |
+| Retidos envelhecendo | `SELECT latest(heldOldestSeconds) FROM CentralizaHealth FACET storeHost` | > 1800 |
+| Atraso alto | `SELECT percentile(lagSeconds, 95) FROM CentralizaDelivery WHERE action = 'delivered' FACET storeHost` | > 600 por 15 min |
+| Cron parado | `SELECT count(*) FROM CentralizaHealth FACET storeHost` | perda de sinal por 5 min |
+| Registro ilegível | `SELECT count(*) FROM CentralizaDelivery WHERE outcome = 'record_unreadable' FACET storeHost` | > 0 |
 
 ## 10. Pendências com o time do Centraliza
 
