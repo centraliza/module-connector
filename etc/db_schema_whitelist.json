@@ -54,5 +54,127 @@
             "PRIMARY": true,
             "CENTRALIZA_CONNECTOR_QUARANTINE_IDEMPOTENCY_KEY": true
         }
+    },
+    "centraliza_rate_limit": {
+        "column": {
+            "api_key_hash": true,
+            "window_started_at": true,
+            "used": true,
+            "blocked_until": true,
+            "key_refused_until": true,
+            "last_check_at": true,
+            "updated_at": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "centraliza_rate_limit_refusal": {
+        "column": {
+            "api_key_hash": true,
+            "route": true,
+            "refused_until": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "centraliza_sales_abandoned_cart": {
+        "column": {
+            "entity_id": true,
+            "quote_id": true,
+            "store_id": true,
+            "website_id": true,
+            "reminder_number": true,
+            "status": true,
+            "attempts": true,
+            "next_attempt_at": true,
+            "last_http_status": true,
+            "last_error": true,
+            "last_attempt_at": true,
+            "quote_updated_at": true,
+            "last_activity_at": true,
+            "sent_at": true,
+            "cart_signature": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "CENTRALIZA_SALES_ABANDONED_CART_WS_ID_STS_NEXT_ATTEMPT_AT": true,
+            "CENTRALIZA_SALES_ABANDONED_CART_STATUS_UPDATED_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "CENTRALIZA_SALES_ABANDONED_CART_QUOTE_ID_REMINDER_NUMBER": true,
+            "CENTRALIZA_SALES_ABANDONED_CART_QUOTE_ID_QUOTE_ENTITY_ID": true
+        }
+    },
+    "centraliza_sales_cart_activity": {
+        "column": {
+            "quote_id": true,
+            "last_activity_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "CENTRALIZA_SALES_CART_ACTIVITY_QUOTE_ID_QUOTE_ENTITY_ID": true
+        }
+    },
+    "centraliza_sales_cart_link": {
+        "column": {
+            "masked_id": true,
+            "quote_id": true,
+            "created_at": true
+        },
+        "index": {
+            "CENTRALIZA_SALES_CART_LINK_QUOTE_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "CENTRALIZA_SALES_CART_LINK_QUOTE_ID_QUOTE_ENTITY_ID": true
+        }
+    },
+    "quote": {
+        "column": {
+            "centraliza_masked_id": true
+        }
+    },
+    "sales_order": {
+        "column": {
+            "centraliza_masked_id": true
+        }
+    },
+    "centraliza_notification": {
+        "column": {
+            "entity_id": true,
+            "event_id": true,
+            "event_type": true,
+            "order_id": true,
+            "increment_id": true,
+            "website_id": true,
+            "from_status": true,
+            "to_status": true,
+            "status": true,
+            "attempts": true,
+            "next_attempt_at": true,
+            "last_error_code": true,
+            "last_error_message": true,
+            "external_id": true,
+            "delivered_at": true,
+            "sent_at": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "CENTRALIZA_NOTIFICATION_STATUS_NEXT_ATTEMPT_AT": true,
+            "CENTRALIZA_NOTIFICATION_WEBSITE_ID_STATUS_NEXT_ATTEMPT_AT": true,
+            "CENTRALIZA_NOTIFICATION_STATUS_UPDATED_AT": true,
+            "CENTRALIZA_NOTIFICATION_INCREMENT_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "CENTRALIZA_NOTIFICATION_EVENT_ID": true,
+            "CENTRALIZA_NOTIFICATION_EXTERNAL_ID": true,
+            "CENTRALIZA_NOTIFICATION_ORDER_ID_SALES_ORDER_ENTITY_ID": true
+        }
     }
 }

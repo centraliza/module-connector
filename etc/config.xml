@@ -13,12 +13,14 @@
                 <connection_id_staging/>
                 <base_url_staging>https://api.centraliza.dev</base_url_staging>
                 <telemetry_log>0</telemetry_log>
+                <debug>0</debug>
             </general>
             <carts>
                 <guests>0</guests>
             </carts>
             <delivery>
                 <max_attempts>5</max_attempts>
+                <bulk_quota_floor>30</bulk_quota_floor>
             </delivery>
         </centraliza_connector>
     </default>

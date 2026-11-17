@@ -52,4 +52,192 @@
             <column name="idempotency_key"/>
         </constraint>
     </table>
+
+    <!--
+        Redeclared from the legacy Centraliza modules, identical to their declarations (Centraliza_Base 1.0.17 and
+        Centraliza_Sales 1.0.23). The schema whitelist of a disabled module still lists its tables, so without
+        these declarations disabling Centraliza_Base or Centraliza_Sales would make setup:upgrade drop them, with
+        the queued messages, the cart links already sent and the columns that sales_order triggers read.
+        Change none of them while the legacy modules are installed: both declarations must stay the same.
+    -->
+    <!-- From Centraliza_Base. -->
+    <!-- One row per API key hash; used is signed: corrections and repetitions can take it past the limit. -->
+    <table name="centraliza_rate_limit" resource="default" engine="innodb"
+           comment="Centraliza request quota per API key, shared by every process">
+        <column xsi:type="varchar" name="api_key_hash" length="64" nullable="false" comment="SHA-256 Of The API Key"/>
+        <column xsi:type="timestamp" name="window_started_at" nullable="true" comment="Current Window Start"/>
+        <column xsi:type="smallint" name="used" unsigned="false" nullable="false" default="0"
+                comment="Requests Counted In The Window"/>
+        <column xsi:type="timestamp" name="blocked_until" nullable="true" comment="Blocked By A 429 Until"/>
+        <column xsi:type="timestamp" name="key_refused_until" nullable="true"
+                comment="Key Paused By A 401 Until"/>
+        <column xsi:type="timestamp" name="last_check_at" nullable="true"
+                comment="Last Authenticate Check Of The Key"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true"
+                comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="api_key_hash"/>
+        </constraint>
+    </table>
+    <!-- A 403 lacks one route's permission, so it pauses only that route of the key. -->
+    <table name="centraliza_rate_limit_refusal" resource="default" engine="innodb"
+           comment="Centraliza route of an API key paused by a 403">
+        <column xsi:type="varchar" name="api_key_hash" length="64" nullable="false" comment="SHA-256 Of The API Key"/>
+        <column xsi:type="varchar" name="route" length="255" nullable="false" comment="Relative API Path"/>
+        <!-- An explicit default: without one, MariaDB with explicit_defaults_for_timestamp=0 adds ON UPDATE,
+             which would reset a live pause. -->
+        <column xsi:type="timestamp" name="refused_until" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Route Paused Until"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="api_key_hash"/>
+            <column name="route"/>
+        </constraint>
+    </table>
+    <!-- From Centraliza_Sales. -->
+    <table name="centraliza_sales_abandoned_cart" resource="default" engine="innodb"
+           comment="Centraliza abandoned carts: selection and delivery record">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="int" name="quote_id" unsigned="true" nullable="false" comment="Quote ID"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" comment="Store ID"/>
+        <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" comment="Website ID"/>
+        <column xsi:type="smallint" name="reminder_number" unsigned="true" nullable="false" default="0"
+                comment="Send Of The Cart, 0 For The First"/>
+        <column xsi:type="varchar" name="status" length="16" nullable="false" default="pending"
+                comment="Delivery State"/>
+        <column xsi:type="smallint" name="attempts" unsigned="true" nullable="false" default="0"
+                comment="Delivery Attempts Including First"/>
+        <column xsi:type="timestamp" name="next_attempt_at" nullable="true" comment="Next Attempt At"/>
+        <column xsi:type="smallint" name="last_http_status" unsigned="true" nullable="true"
+                comment="Last HTTP Status"/>
+        <column xsi:type="text" name="last_error" nullable="true" comment="Last Error"/>
+        <column xsi:type="timestamp" name="last_attempt_at" nullable="true" comment="Last Attempt At"/>
+        <column xsi:type="timestamp" name="quote_updated_at" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Quote Updated At When Selected"/>
+        <!-- The wait that was applied: without it a past send cannot be audited, only guessed at. -->
+        <column xsi:type="timestamp" name="last_activity_at" nullable="true"
+                comment="Customer Last Activity When Selected, Null On Rows From Before This Column"/>
+        <column xsi:type="timestamp" name="sent_at" nullable="true" comment="Accepted By Centraliza At"/>
+        <column xsi:type="varchar" name="cart_signature" length="64" nullable="true"
+                comment="SHA-256 Of The Cart Content Sent, Null On Rows From Before This Column"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true"
+                comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <!-- One row per send: reminder_number 0 is the cart's first message, 1, 2... each resend after a change. -->
+        <constraint xsi:type="unique" referenceId="CENTRALIZA_SALES_ABANDONED_CART_QUOTE_ID_REMINDER_NUMBER">
+            <column name="quote_id"/>
+            <column name="reminder_number"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="CENTRALIZA_SALES_ABANDONED_CART_QUOTE_ID_QUOTE_ENTITY_ID"
+                    table="centraliza_sales_abandoned_cart" column="quote_id"
+                    referenceTable="quote" referenceColumn="entity_id" onDelete="CASCADE"/>
+        <index referenceId="CENTRALIZA_SALES_ABANDONED_CART_WEBSITE_ID_STATUS_NEXT_ATTEMPT_AT" indexType="btree">
+            <column name="website_id"/>
+            <column name="status"/>
+            <column name="next_attempt_at"/>
+        </index>
+        <index referenceId="CENTRALIZA_SALES_ABANDONED_CART_STATUS_UPDATED_AT" indexType="btree">
+            <column name="status"/>
+            <column name="updated_at"/>
+        </index>
+    </table>
+    <!-- The customer's last view of the cart or the checkout: the core does not record those page views over HTTPS. -->
+    <table name="centraliza_sales_cart_activity" resource="default" engine="innodb"
+           comment="Centraliza abandoned carts: last cart or checkout page view per cart">
+        <column xsi:type="int" name="quote_id" unsigned="true" nullable="false" comment="Quote ID"/>
+        <column xsi:type="timestamp" name="last_activity_at" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Last Cart Or Checkout View At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="quote_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="CENTRALIZA_SALES_CART_ACTIVITY_QUOTE_ID_QUOTE_ENTITY_ID"
+                    table="centraliza_sales_cart_activity" column="quote_id"
+                    referenceTable="quote" referenceColumn="entity_id" onDelete="CASCADE"/>
+    </table>
+    <!-- Link ids of customer carts: in quote_id_mask any anonymous route that skips the owner check would open the
+         cart with them; here only the cart redirect, which checks the owner, reads them. -->
+    <table name="centraliza_sales_cart_link" resource="checkout" engine="innodb"
+           comment="Centraliza cart redirect: link ids of customer carts">
+        <column xsi:type="varchar" name="masked_id" length="32" nullable="false" comment="Link Masked ID"/>
+        <column xsi:type="int" name="quote_id" unsigned="true" nullable="false" comment="Quote ID"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="masked_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="CENTRALIZA_SALES_CART_LINK_QUOTE_ID_QUOTE_ENTITY_ID"
+                    table="centraliza_sales_cart_link" column="quote_id"
+                    referenceTable="quote" referenceColumn="entity_id" onDelete="CASCADE"/>
+        <index referenceId="CENTRALIZA_SALES_CART_LINK_QUOTE_ID" indexType="btree">
+            <column name="quote_id"/>
+        </index>
+    </table>
+    <!-- The link's masked id, kept here because the core deletes the quote_id_mask row on login and with the
+         quote: the order still names the cart Centraliza knows. -->
+    <table name="quote" resource="checkout">
+        <column xsi:type="varchar" name="centraliza_masked_id" length="32" nullable="true"
+                comment="Masked ID Of The Centraliza Link That Opened The Cart"/>
+    </table>
+    <table name="sales_order" resource="sales">
+        <column xsi:type="varchar" name="centraliza_masked_id" length="32" nullable="true"
+                comment="Masked ID Of The Centraliza Link That Opened The Cart"/>
+    </table>
+    <!-- The name stays from the Notification module, so the move keeps the rows already queued. -->
+    <table name="centraliza_notification" resource="default" engine="innodb"
+           comment="Centraliza order status notifications: queue and delivery record">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="varchar" name="event_id" length="39" nullable="false" comment="Event ID"/>
+        <!-- One queue for every order event, so an order's events keep the order they happened in. -->
+        <column xsi:type="varchar" name="event_type" length="32" nullable="false" default="order.status_updated"
+                comment="Centraliza Event Type"/>
+        <column xsi:type="int" name="order_id" unsigned="true" nullable="false" comment="Order ID"/>
+        <column xsi:type="varchar" name="increment_id" length="50" nullable="false" comment="Order Increment ID"/>
+        <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" comment="Website ID"/>
+        <column xsi:type="varchar" name="from_status" length="32" nullable="true" comment="Previous Status"/>
+        <column xsi:type="varchar" name="to_status" length="32" nullable="false" comment="Notified Status"/>
+        <column xsi:type="varchar" name="status" length="16" nullable="false" default="pending"
+                comment="Delivery State"/>
+        <column xsi:type="smallint" name="attempts" unsigned="true" nullable="false" default="0" comment="Sends"/>
+        <column xsi:type="timestamp" name="next_attempt_at" nullable="true" comment="Next Attempt At"/>
+        <column xsi:type="smallint" name="last_error_code" unsigned="true" nullable="true" comment="Last Error Code"/>
+        <column xsi:type="varchar" name="last_error_message" length="500" nullable="true" comment="Last Error Message"/>
+        <column xsi:type="varchar" name="external_id" length="64" nullable="true" comment="Centraliza Notification ID"/>
+        <column xsi:type="timestamp" name="delivered_at" nullable="true" comment="Accepted By Centraliza At"/>
+        <column xsi:type="timestamp" name="sent_at" nullable="true" comment="Dispatch Callback At"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP"
+                comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true"
+                comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="CENTRALIZA_NOTIFICATION_EVENT_ID">
+            <column name="event_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="CENTRALIZA_NOTIFICATION_EXTERNAL_ID">
+            <column name="external_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="CENTRALIZA_NOTIFICATION_ORDER_ID_SALES_ORDER_ENTITY_ID"
+                    table="centraliza_notification" column="order_id"
+                    referenceTable="sales_order" referenceColumn="entity_id" onDelete="CASCADE"/>
+        <index referenceId="CENTRALIZA_NOTIFICATION_STATUS_NEXT_ATTEMPT_AT" indexType="btree">
+            <column name="status"/>
+            <column name="next_attempt_at"/>
+        </index>
+        <index referenceId="CENTRALIZA_NOTIFICATION_WEBSITE_ID_STATUS_NEXT_ATTEMPT_AT" indexType="btree">
+            <column name="website_id"/>
+            <column name="status"/>
+            <column name="next_attempt_at"/>
+        </index>
+        <index referenceId="CENTRALIZA_NOTIFICATION_STATUS_UPDATED_AT" indexType="btree">
+            <column name="status"/>
+            <column name="updated_at"/>
+        </index>
+        <index referenceId="CENTRALIZA_NOTIFICATION_INCREMENT_ID" indexType="btree">
+            <column name="increment_id"/>
+        </index>
+    </table>
 </schema>

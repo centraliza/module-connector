@@ -114,6 +114,103 @@
         </arguments>
     </type>
 
+    <!--
+        Messaging: the order and cart messages ported from the legacy Centraliza modules (Messaging/). Virtual
+        types carry a CentralizaConnector prefix: their names are global, and the legacy modules use the
+        unprefixed ones.
+    -->
+    <preference for="Centraliza\Connector\Messaging\Api\ConfigInterface" type="Centraliza\Connector\Messaging\Model\Config"/>
+    <preference for="Centraliza\Connector\Messaging\Api\CentralizaClientInterface" type="Centraliza\Connector\Messaging\Model\Api\Client"/>
+    <preference for="Centraliza\Connector\Messaging\Api\Data\ConnectionResultInterface" type="Centraliza\Connector\Messaging\Model\Data\ConnectionResult"/>
+    <preference for="Centraliza\Connector\Messaging\Api\ConnectionValidatorInterface" type="Centraliza\Connector\Messaging\Model\Auth\ConnectionValidator"/>
+    <preference for="Centraliza\Connector\Messaging\Api\ScopeResolverInterface" type="Centraliza\Connector\Messaging\Model\Config\ScopeResolver"/>
+    <preference for="Centraliza\Connector\Messaging\Api\StoreScopeInterface" type="Centraliza\Connector\Messaging\Model\Store\StoreScope"/>
+    <preference for="Centraliza\Connector\Messaging\Api\ApiKeyGroupingInterface" type="Centraliza\Connector\Messaging\Model\Api\ApiKeyGrouping"/>
+    <preference for="Centraliza\Connector\Messaging\Api\PhoneNumberFormatterInterface" type="Centraliza\Connector\Messaging\Model\Phone\PhoneNumberFormatter"/>
+    <preference for="Centraliza\Connector\Messaging\Api\QuotaReservationInterface" type="Centraliza\Connector\Messaging\Model\Api\QuotaReservation"/>
+    <preference for="Centraliza\Connector\Messaging\Api\RotationInterface" type="Centraliza\Connector\Messaging\Model\Api\Rotation"/>
+    <preference for="Centraliza\Connector\Messaging\Api\KeyLockInterface" type="Centraliza\Connector\Messaging\Model\Lock\KeyLock"/>
+    <!-- Monolog\Logger: the framework logger's inherited handlers would copy every entry to system.log. -->
+    <virtualType name="CentralizaConnectorMessagingLogger" type="Monolog\Logger">
+        <arguments>
+            <argument name="name" xsi:type="string">centraliza</argument>
+            <argument name="handlers" xsi:type="array">
+                <item name="centraliza" xsi:type="object">Centraliza\Connector\Messaging\Logger\Handler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <type name="Centraliza\Connector\Messaging\Model\Api\FailSafeLogger">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorMessagingLogger</argument>
+        </arguments>
+    </type>
+    <!-- An unwritable centraliza.log must not turn a log call into an exception that aborts a save or a send. -->
+    <virtualType name="CentralizaConnectorSafeLogger" type="Centraliza\Connector\Messaging\Model\Api\FailSafeLogger">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorMessagingLogger</argument>
+        </arguments>
+    </virtualType>
+    <!-- Routine trace lines of the messaging flows: written only while Debug Log is on. -->
+    <virtualType name="CentralizaConnectorDebugLogger" type="Centraliza\Connector\Messaging\Model\Api\DebugLogger">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </virtualType>
+    <type name="Centraliza\Connector\Messaging\Model\Auth\ConnectionValidator">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+            <argument name="client" xsi:type="object">CentralizaConnectorInteractiveClient</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\Api\QuotaReservation">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\Auth\RejectedKeyStore">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\Lock\KeyLock">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\Api\ApiKeyGrouping">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <!-- A logging failure after the response must not replace the answer Centraliza already gave. -->
+    <type name="Centraliza\Connector\Messaging\Model\Api\ClientFactory">
+        <arguments>
+            <argument name="logger" xsi:type="object">Centraliza\Connector\Messaging\Model\Api\FailSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\Api\Client">
+        <arguments>
+            <argument name="logger" xsi:type="object">Centraliza\Connector\Messaging\Model\Api\FailSafeLogger</argument>
+        </arguments>
+    </type>
+    <!-- Priority is fixed per injected client; the plain preference is transactional (order messages). -->
+    <virtualType name="CentralizaConnectorInteractiveClient" type="Centraliza\Connector\Messaging\Model\Api\Client">
+        <arguments>
+            <argument name="priority" xsi:type="const">Centraliza\Connector\Messaging\Api\QuotaReservationInterface::PRIORITY_INTERACTIVE</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="CentralizaConnectorMarketingClient" type="Centraliza\Connector\Messaging\Model\Api\Client">
+        <arguments>
+            <argument name="priority" xsi:type="const">Centraliza\Connector\Messaging\Api\QuotaReservationInterface::PRIORITY_MARKETING</argument>
+        </arguments>
+    </virtualType>
+    <!-- Connection events take the bulk share of the key's quota. -->
+    <type name="Centraliza\Connector\Infra\Http\SharedQuota">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+
     <type name="Magento\Config\Model\Config\TypePool">
         <arguments>
             <argument name="sensitive" xsi:type="array">

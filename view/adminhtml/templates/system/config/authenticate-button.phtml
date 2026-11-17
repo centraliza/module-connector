@@ -1,0 +1,37 @@
+<?php
+/**
+ * Copyright © Centraliza. All rights reserved.
+ *
+ * @var \Centraliza\Connector\Messaging\Block\Adminhtml\System\Config\AuthenticateButton $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+declare(strict_types=1);
+
+$statusColor = $block->getStatusColor();
+$legacyNotice = $block->getLegacyNotice();
+?>
+<div class="centraliza-authenticate"
+     data-mage-init='<?= $escaper->escapeHtmlAttr(json_encode([
+         'Centraliza_Connector/js/authenticate' => [
+             'validateUrl' => $block->getValidateUrl(),
+             'websiteId' => $block->getWebsiteId(),
+             'apiKeyFieldId' => $block->getApiKeyFieldId(),
+             'environmentFieldId' => $block->getEnvironmentFieldId(),
+             'environment' => $block->getEnvironment(),
+             'autoCheck' => $block->hasStoredKey(),
+         ],
+     ])) ?>'>
+    <button type="button" class="action-default" data-role="centraliza-authenticate"
+            <?php if ($block->getElementId() !== null): ?>id="<?= $escaper->escapeHtmlAttr($block->getElementId()) ?>"<?php endif; ?>>
+        <span><?= $escaper->escapeHtml(__('Authenticate')) ?></span>
+    </button>
+    <p class="note">
+        <strong data-role="centraliza-connection-status"<?php if ($statusColor !== null): ?> style="color: <?= $escaper->escapeHtmlAttr($statusColor) ?>"<?php endif; ?>>
+            <?= $escaper->escapeHtml($block->getStatusMessage()) ?>
+        </strong>
+    </p>
+    <?php if ($legacyNotice !== null): ?>
+        <p class="note"><span><?= $escaper->escapeHtml($legacyNotice) ?></span></p>
+    <?php endif; ?>
+</div>

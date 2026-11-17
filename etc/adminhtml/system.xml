@@ -7,7 +7,7 @@
             <tab>service</tab>
             <resource>Centraliza_Connector::config</resource>
             <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
-                <label>Connection events</label>
+                <label>Connection</label>
                 <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
                     <label>Report changes to Centraliza</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
@@ -53,6 +53,16 @@
                         <field id="environment">staging</field>
                     </depends>
                 </field>
+                <!-- Checks the saved environment's key with GET admin/workspace; the messages need a checked key. -->
+                <field id="authenticate" translate="label" sortOrder="45" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Status</label>
+                    <frontend_model>Centraliza\Connector\Messaging\Block\Adminhtml\System\Config\AuthenticateButton</frontend_model>
+                </field>
+                <field id="debug" translate="label comment" type="select" sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                    <label>Debug Log</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Writes one line per message request to Centraliza (method, path, status and error) to var/log/centraliza.log. Errors are written there whatever this setting. Turn it on while investigating and off afterwards.</comment>
+                </field>
             </group>
             <group id="carts" translate="label" type="text" sortOrder="15" showInDefault="1" showInWebsite="1" showInStore="0">
                 <label>Carts</label>
@@ -68,6 +78,11 @@
                     <label>Maximum attempts</label>
                     <validate>required-entry validate-digits validate-greater-than-zero</validate>
                     <comment>How many times an event is sent while Centraliza is unavailable. Each failure waits longer before the next try; the last one moves the event to quarantine, where it stays until someone reviews it.</comment>
+                </field>
+                <field id="bulk_quota_floor" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                    <label>Requests Kept For Messages</label>
+                    <validate>required-entry validate-digits validate-digits-range digits-range-21-59</validate>
+                    <comment>Centraliza allows 60 requests a minute per API key, shared by the connection events and the order and cart messages. Connection events stop for the minute when this many are left. Allowed: 21 to 59, so they always stop before abandoned-cart reminders, which stop with 20 left.</comment>
                 </field>
             </group>
         </section>

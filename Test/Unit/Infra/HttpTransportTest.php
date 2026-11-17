@@ -10,6 +10,7 @@ use Centraliza\Connector\Core\Model\OutcomeKind;
 use Centraliza\Connector\Core\Port\ClockInterface;
 use Centraliza\Connector\Infra\Config\Settings;
 use Centraliza\Connector\Infra\Http\HttpTransport;
+use Centraliza\Connector\Infra\Http\SharedQuota;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
@@ -28,6 +29,12 @@ class HttpTransportTest extends TestCase
     private array $sent = [];
 
     private string $apiKey = self::KEY;
+
+    /** Seconds the shared quota answers when asked for a request; 0 reserves it. */
+    private int $quotaWait = 0;
+
+    /** @var list<int> statuses handed to the shared quota */
+    private array $recorded = [];
 
     public function testSendsTheEventAsDocumented(): void
     {
@@ -111,6 +118,24 @@ class HttpTransportTest extends TestCase
         self::assertSame([], $this->sent);
     }
 
+    public function testAUsedUpQuotaHoldsTheEventWithoutSending(): void
+    {
+        $this->quotaWait = 42;
+
+        $outcome = $this->transport(new Response(200))->send($this->event());
+
+        self::assertSame(OutcomeKind::RateLimited, $outcome->kind);
+        self::assertSame(42, $outcome->retryAfterSeconds);
+        self::assertSame([], $this->sent);
+    }
+
+    public function testEveryAnswerIsRecordedInTheSharedQuota(): void
+    {
+        $this->transport(new Response(429, ['Retry-After' => '5']))->send($this->event());
+
+        self::assertSame([429], $this->recorded);
+    }
+
     private function event(): ConnectionEvent
     {
         return new ConnectionEvent('stock', EventVerb::Updated, ['sku' => 'A', 'source_code' => 'default'], 'idem-1', '2026-11-13T00:00:00Z');
@@ -127,6 +152,12 @@ class HttpTransportTest extends TestCase
         $clock = $this->createMock(ClockInterface::class);
         $clock->method('now')->willReturn(self::NOW);
 
-        return new HttpTransport(new Client(['handler' => $stack]), $settings, $clock);
+        $quota = $this->createMock(SharedQuota::class);
+        $quota->method('take')->willReturnCallback(fn () => $this->quotaWait);
+        $quota->method('record')->willReturnCallback(function (string $key, $response): void {
+            $this->recorded[] = $response->getStatusCode();
+        });
+
+        return new HttpTransport(new Client(['handler' => $stack]), $settings, $clock, $quota);
     }
 }

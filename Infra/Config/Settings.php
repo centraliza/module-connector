@@ -128,7 +128,15 @@ class Settings implements SettingsInterface
      */
     public function apiKey(): string
     {
-        return trim((string)$this->scopeConfig->getValue(self::XML_PATH_API_KEY . $this->environment()));
+        return trim((string)$this->scopeConfig->getValue($this->apiKeyPath()));
+    }
+
+    /**
+     * Where the selected environment's key is stored (default scope, encrypted).
+     */
+    public function apiKeyPath(): string
+    {
+        return self::XML_PATH_API_KEY . $this->environment();
     }
 
     public function baseUrl(): string

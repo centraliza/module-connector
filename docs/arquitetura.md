@@ -109,6 +109,7 @@ flowchart TB
     subgraph infra["Infra/"]
         QP["Queue\EventPublisher"]
         TR["Http\SwitchingTransport<br/>HttpTransport | DryRunTransport"]
+        SQ["Http\SharedQuota"]
         RS["Persistence\RetryStore"]
         QS["Persistence\QuarantineStore"]
         CS["Persistence\CircuitStore"]
@@ -120,6 +121,10 @@ flowchart TB
         POL["ConnectionEventPolicy"]
         CB["CircuitBreaker"]
         BO["Backoff"]
+    end
+
+    subgraph messaging["Messaging/ (transplantado dos antigos)"]
+        QR["Model\Api\QuotaReservation<br/>centraliza_rate_limit"]
     end
 
     subgraph edges["Bordas"]
@@ -140,12 +145,16 @@ flowchart TB
     DEL --> POL
     POL --> BO
     DEL --> TR
+    TR --> SQ
+    SQ --> QR
     DEL -.->|"Retry, Postpone"| RS
     DEL -.->|"Quarantine"| QS
     CB --> CS
 ```
 
 Adicionar uma entidade: os hooks em `Entity/<Tipo>/` e um item no `StreamRegistry` via `di.xml` (stream, lane, campos de chave). Nada muda em `Core/`, nos XML de fila ou nas tabelas.
+
+`Messaging/` é o código dos módulos antigos trazido para cá (mensagens de pedido e carrinho, link de recuperação, validação da chave), com a estrutura original (`Api`, `Model`, `Service`...). Ele não passa por `Core/`: as regras de entrega dele (no máximo uma vez, FIFO por pedido) são outras. O que ele divide com os eventos de conexão é a configuração (`Infra\Config\Settings`) e a cota por chave. Ver [legado.md](legado.md).
 
 ## 4. Filas
 
@@ -414,20 +423,19 @@ erDiagram
         int open_until
         int probe_until
     }
-    centraliza_connector_engagement {
-        int event_row_id PK
-        char event_id UK
-        varchar type
-        int ref_id
-        int website_id
-        varchar status
-        smallint attempts
-        datetime next_attempt_at
-        varchar external_id
+    centraliza_rate_limit {
+        varchar api_key_hash PK
+        timestamp window_started_at
+        smallint used
+        timestamp blocked_until
+        timestamp key_refused_until
+        timestamp last_check_at
     }
 ```
 
 `centraliza_connector_retry` só tem eventos esperando a próxima tentativa; `centraliza_connector_quarantine`, os que esgotaram as tentativas ou foram rejeitados. Em operação normal as duas ficam vazias.
+
+`centraliza_rate_limit` é a cota de requisições por chave, compartilhada com as mensagens (ver [legado.md](legado.md#cota-compartilhada)). O módulo também declara, idênticas, as tabelas e colunas dos módulos antigos que as mensagens usam (`centraliza_notification`, `centraliza_sales_*`, `quote.centraliza_masked_id`, `sales_order.centraliza_masked_id`), para que desabilitar os antigos não as apague.
 
 Configuração em Stores > Configuration > Services > Centraliza Connector:
 
@@ -440,6 +448,10 @@ Configuração em Stores > Configuration > Services > Centraliza Connector:
 | `centraliza_connector/general/connection_id_{production,staging}` | global | channel ID (UUID da conexão Magento) de cada ambiente |
 | `centraliza_connector/carts/guests` | website | reporta carrinhos sem cliente; padrão Não |
 | `centraliza_connector/delivery/max_attempts` | global | quantas vezes um evento é enviado antes de ir para a quarentena; padrão 5 |
+| `centraliza_connector/delivery/bulk_quota_floor` | global | requisições por minuto reservadas para as mensagens; os eventos de conexão param quando restam estas; padrão 30 (21 a 59) |
+| `centraliza_connector/general/debug` | global | grava uma linha por requisição de mensagem em `var/log/centraliza.log` |
+| `centraliza_connector/connection/{key_hash,workspace_name,validated_at}_{production,staging}` | global, gravado pelo botão Autenticar | estado da validação da chave de cada ambiente; as mensagens só saem com a chave validada |
+| `centraliza_connector/connection/rejected_keys` | global | chaves que a Centraliza recusou, por hash |
 | `centraliza_connector/general/base_url_{production,staging}` | global, sem campo no admin | `https://api.centraliza.ai` e `https://api.centraliza.dev` |
 
 Em modo `live` sem chave ou sem channel ID no ambiente selecionado, nada é enviado: o evento é retido como em um `401`, sem gastar tentativa. Trocar de ambiente não migra a fila: eventos ainda não entregues saem para o ambiente novo.
@@ -448,9 +460,11 @@ Em modo `live` sem chave ou sem channel ID no ambiente selecionado, nada é envi
 
 ### Migração dos módulos antigos
 
-Os módulos antigos (`Centraliza_Base`, `Centraliza_Notification`, `Centraliza_Sales`) continuam instalados e ativos: status de pedido por WhatsApp, carrinho abandonado, link de recuperação de carrinho e callback de entrega ainda vivem neles. Este módulo substitui só as notificações de catálogo. Desabilitá-los com `module:disable` faria o `setup:upgrade` seguinte apagar as tabelas deles: a whitelist do declarative schema vem de todos os módulos registrados, mas a declaração só dos ativos.
+Os módulos antigos (`Centraliza_Base`, `Centraliza_Notification`, `Centraliza_Sales`) continuam instalados e ativos: status de pedido por WhatsApp, carrinho abandonado, link de recuperação de carrinho e callback de entrega ainda vivem neles. Este módulo substitui as notificações de catálogo e está recebendo o resto por transplante, em fases ([legado.md](legado.md)). Enquanto `Centraliza_Sales` estiver habilitado, as mensagens daqui ficam paradas (`Messaging\Model\Config::isReady()`), então o corte é um deploy que desabilita os três no `config.php`.
 
-Os antigos falam só com produção (`https://api.centraliza.ai/v1/`, fixo no código) e respeitam o limite de requisições por chave sem enxergar o tráfego deste módulo. Com a mesma chave nos dois, uma rajada de catálogo daqui consome a cota das mensagens de WhatsApp.
+Desde a fase 1 as tabelas e colunas dos antigos que as mensagens usam estão declaradas aqui também, então desabilitá-los só apaga as 7 tabelas do catálogo antigo. Antes disso, ponha os indexers do catálogo antigo em "Update on Save" (`bin/magento indexer:set-mode realtime centraliza_catalog_product centraliza_catalog_inventory centraliza_catalog_stock_links`), para os triggers deles saírem antes.
+
+Os antigos falam só com produção (`https://api.centraliza.ai/v1/`, fixo no código). A cota por chave é a mesma tabela para os dois (`centraliza_rate_limit`), e os eventos de conexão reservam nela com a prioridade mais baixa: uma rajada daqui não esgota a cota das mensagens de WhatsApp.
 
 ```bash
 bin/magento centraliza:legacy:import-config --dry-run
@@ -525,10 +539,11 @@ As condições são criadas no New Relic, em uma policy com notificação para a
 7. Clientes: usar o stream `customers` ou os eventos canônicos `contact.created` e `contact.updated`? Os dois existem e não está dito como se relacionam.
 8. Pedidos: o conector Magento do Centraliza já importa pedidos por polling a cada 15 minutos. Um evento `orders.updated` antecipa essa leitura, ou é ignorado?
 9. A Admin API não tem rota de criação de `locations` nem de `orders` (só leitura e, para pedidos, update e delete). O stream `locations` existe?
-10. Qual é o limite real de `POST /v1/admin/events`: 6.000 por minuto (convenções) ou 60 (guia de API keys)?
+10. Qual é o limite real de `POST /v1/admin/events`: 6.000 por minuto (convenções) ou 60 (guia de API keys)? Os módulos antigos mediram 60 por chave, e este módulo segue esse número: os eventos ficam com ~30 por minuto, o resto fica para as mensagens. Dá para ter um limite maior ou uma cota separada para os eventos?
 
 ## 11. Limites conhecidos
 
 - Escrita por SQL direto não gera evento.
 - Um processo morto entre o commit e o publish, com conexão `amqp`, perde o evento. Com conexão `db` isso não acontece, porque o publish está na mesma transação.
 - O módulo não sabe se o Centraliza processou o evento, só que o aceitou (`200`).
+- Vazão: com a cota de 60 requisições por minuto por chave dividida com as mensagens, os eventos saem a no máximo `60 - bulk_quota_floor` por minuto (30 no padrão).

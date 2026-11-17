@@ -16,7 +16,7 @@ use Psr\Http\Message\ResponseInterface;
 use Throwable;
 
 /**
- * POST /v1/admin/events, one event per request.
+ * POST /v1/admin/events, one event per request, inside the request quota the key shares with the messages.
  */
 class HttpTransport implements TransportInterface
 {
@@ -28,7 +28,8 @@ class HttpTransport implements TransportInterface
     public function __construct(
         private readonly ClientInterface $client,
         private readonly Settings $settings,
-        private readonly ClockInterface $clock
+        private readonly ClockInterface $clock,
+        private readonly SharedQuota $quota
     ) {
     }
 
@@ -40,6 +41,17 @@ class HttpTransport implements TransportInterface
         if ($apiKey === '' || $connectionId === '' || $baseUrl === '') {
             // Held like a refused key: nothing is sent and no attempt is spent until it is configured.
             return Outcome::of(OutcomeKind::Unauthorized, 'The API key or the connection id is not configured.');
+        }
+
+        try {
+            $wait = $this->quota->take($apiKey);
+        } catch (Throwable $e) {
+            // Sending unreserved would let every consumer exceed the limit at once.
+            return Outcome::unavailable(null, 'The shared request quota could not be checked: ' . $e::class);
+        }
+        if ($wait > 0) {
+            // Used up for now, or the key is paused: no attempt is spent.
+            return new Outcome(OutcomeKind::RateLimited, $wait, 'Shared request quota used up or paused.');
         }
 
         try {
@@ -58,6 +70,8 @@ class HttpTransport implements TransportInterface
             // The class only: a Guzzle message can quote the request, and the request carries the key.
             return Outcome::unavailable(null, 'No answer: ' . $e::class);
         }
+
+        $this->quota->record($apiKey, $response);
 
         return $this->classify($response);
     }

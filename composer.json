@@ -19,7 +19,10 @@
         "magento/module-inventory-catalog-api": "*",
         "magento/module-inventory-sales-api": "*",
         "magento/module-config": "*",
-        "guzzlehttp/guzzle": "^7.0"
+        "magento/module-backend": "*",
+        "magento/module-ui": "*",
+        "guzzlehttp/guzzle": "^7.4",
+        "giggsey/libphonenumber-for-php": "^9.0"
     },
     "autoload": {
         "files": [
