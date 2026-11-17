@@ -489,7 +489,7 @@ O comando nunca desliga um website no conector e não mexe no `mode` nem no `env
 
 ## Telas do admin
 
-Menu **Centraliza Connector** (ACL `Centraliza_Connector::centraliza_connector`, separada da configuração, para que dar acesso às telas não dê acesso à chave):
+Menu **Centraliza** (ACL `Centraliza_Connector::centraliza_connector`, separada da configuração, para que dar acesso às telas não dê acesso à chave):
 
 | Tela | Rota | ACL | O que mostra |
 |---|---|---|---|

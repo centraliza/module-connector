@@ -5,7 +5,7 @@
             <resource id="Magento_Backend::admin">
                 <!-- Outside Stores > Configuration on purpose: saving a role also grants every ancestor of a checked
                      resource, so a screen under the configuration node would hand its users the API key too. -->
-                <resource id="Centraliza_Connector::centraliza_connector" title="Centraliza Connector" translate="title" sortOrder="81">
+                <resource id="Centraliza_Connector::centraliza_connector" title="Centraliza" translate="title" sortOrder="81">
                     <resource id="Centraliza_Connector::manage" title="Dashboard and sends" translate="title" sortOrder="10"/>
                     <resource id="Centraliza_Connector::deliveries" title="Sent requests" translate="title" sortOrder="20"/>
                 </resource>

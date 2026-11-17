@@ -27,7 +27,7 @@ class Index extends Action implements HttpGetActionInterface
         if (!$page instanceof Page) {
             throw new \LogicException('The admin page result was expected.');
         }
-        $page->setActiveMenu('Centraliza_Connector::deliveries');
+        $page->setActiveMenu('Centraliza_Connector::centraliza_deliveries');
         $page->getConfig()->getTitle()->prepend((string)__('Sent Requests'));
 
         return $page;
