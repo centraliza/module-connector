@@ -9,6 +9,9 @@
                 <connection_id/>
                 <base_url>https://api.centraliza.ai</base_url>
             </general>
+            <carts>
+                <guests>0</guests>
+            </carts>
             <delivery>
                 <max_attempts>5</max_attempts>
             </delivery>

@@ -29,4 +29,8 @@ interface SettingsInterface
      */
     public function maxAttempts(): int;
 
+    /**
+     * Whether carts with no customer behind them are reported for this website.
+     */
+    public function reportsGuestCarts(int $websiteId): bool;
 }

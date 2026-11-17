@@ -42,6 +42,33 @@
                         <item name="source_code" xsi:type="string">source_code</item>
                     </item>
                 </item>
+                <item name="customers" xsi:type="array">
+                    <item name="lane" xsi:type="string">realtime</item>
+                    <item name="key" xsi:type="array">
+                        <item name="customer_id" xsi:type="string">customer_id</item>
+                        <item name="email" xsi:type="string">email</item>
+                    </item>
+                </item>
+                <item name="customer_groups" xsi:type="array">
+                    <item name="lane" xsi:type="string">realtime</item>
+                    <item name="key" xsi:type="array">
+                        <item name="group_id" xsi:type="string">group_id</item>
+                        <item name="code" xsi:type="string">code</item>
+                    </item>
+                </item>
+                <item name="orders" xsi:type="array">
+                    <item name="lane" xsi:type="string">realtime</item>
+                    <item name="key" xsi:type="array">
+                        <item name="order_id" xsi:type="string">order_id</item>
+                        <item name="increment_id" xsi:type="string">increment_id</item>
+                    </item>
+                </item>
+                <item name="carts" xsi:type="array">
+                    <item name="lane" xsi:type="string">realtime</item>
+                    <item name="key" xsi:type="array">
+                        <item name="cart_id" xsi:type="string">cart_id</item>
+                    </item>
+                </item>
                 <item name="stock" xsi:type="array">
                     <item name="lane" xsi:type="string">realtime</item>
                     <item name="key" xsi:type="array">

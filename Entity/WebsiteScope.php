@@ -6,6 +6,8 @@ namespace Centraliza\Connector\Entity;
 
 use Centraliza\Connector\Core\Port\SettingsInterface;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Store\Model\StoreManagerInterface;
 
 /**
  * Only records that belong to a website with a reporting store view are reported.
@@ -14,8 +16,31 @@ class WebsiteScope
 {
     public function __construct(
         private readonly SettingsInterface $settings,
-        private readonly ResourceConnection $resource
+        private readonly ResourceConnection $resource,
+        private readonly StoreManagerInterface $storeManager
     ) {
+    }
+
+    /**
+     * The website a store view belongs to, or null when the store view no longer exists.
+     */
+    public function websiteOfStore(int $storeId): ?int
+    {
+        try {
+            return (int)$this->storeManager->getStore($storeId)->getWebsiteId();
+        } catch (NoSuchEntityException) {
+            return null;
+        }
+    }
+
+    /**
+     * For records that belong to a store view, such as orders and carts.
+     */
+    public function coversStore(int $storeId): bool
+    {
+        $websiteId = $this->websiteOfStore($storeId);
+
+        return $websiteId !== null && $this->coversAny([$websiteId]);
     }
 
     /**

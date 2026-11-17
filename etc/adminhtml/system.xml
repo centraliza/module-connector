@@ -28,6 +28,14 @@
                     <comment>UUID of the Magento connection, from Centraliza > Settings > Channels.</comment>
                 </field>
             </group>
+            <group id="carts" translate="label" type="text" sortOrder="15" showInDefault="1" showInWebsite="1" showInStore="0">
+                <label>Carts</label>
+                <field id="guests" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Report guest carts</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>When No, a cart is reported only once it belongs to a customer.</comment>
+                </field>
+            </group>
             <group id="delivery" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
                 <label>Delivery</label>
                 <field id="max_attempts" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">

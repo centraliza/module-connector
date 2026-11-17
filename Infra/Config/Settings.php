@@ -16,6 +16,7 @@ class Settings implements SettingsInterface
     private const XML_PATH_MODE = 'centraliza_connector/general/mode';
     private const XML_PATH_API_KEY = 'centraliza_connector/general/api_key';
     private const XML_PATH_BASE_URL = 'centraliza_connector/general/base_url';
+    private const XML_PATH_GUEST_CARTS = 'centraliza_connector/carts/guests';
     private const XML_PATH_MAX_ATTEMPTS = 'centraliza_connector/delivery/max_attempts';
 
     private const DEFAULT_MAX_ATTEMPTS = 5;
@@ -56,6 +57,11 @@ class Settings implements SettingsInterface
         $configured = (int)$this->scopeConfig->getValue(self::XML_PATH_MAX_ATTEMPTS);
 
         return $configured >= 1 ? $configured : self::DEFAULT_MAX_ATTEMPTS;
+    }
+
+    public function reportsGuestCarts(int $websiteId): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_GUEST_CARTS, ScopeInterface::SCOPE_WEBSITE, $websiteId);
     }
 
     /**

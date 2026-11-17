@@ -12,6 +12,8 @@
         "magento/module-catalog": "*",
         "magento/module-customer": "*",
         "magento/module-eav": "*",
+        "magento/module-sales": "*",
+        "magento/module-quote": "*",
         "magento/module-inventory": "*",
         "magento/module-inventory-api": "*",
         "magento/module-inventory-catalog-api": "*",

@@ -13,4 +13,73 @@
     <event name="customer_group_delete_before">
         <observer name="centraliza_connector_record_group_tier_prices" instance="Centraliza\Connector\Entity\Price\Observer\RecordGroupDelete"/>
     </event>
+    <event name="customer_save_before">
+        <observer name="centraliza_connector_record_customer" instance="Centraliza\Connector\Entity\Customer\Observer\RecordCustomer"/>
+    </event>
+    <event name="customer_save_after">
+        <observer name="centraliza_connector_record_customer" instance="Centraliza\Connector\Entity\Customer\Observer\RecordCustomer"/>
+    </event>
+    <event name="customer_delete_before">
+        <observer name="centraliza_connector_record_customer" instance="Centraliza\Connector\Entity\Customer\Observer\RecordCustomer"/>
+    </event>
+    <event name="customer_delete_after">
+        <observer name="centraliza_connector_record_customer" instance="Centraliza\Connector\Entity\Customer\Observer\RecordCustomer"/>
+    </event>
+    <event name="customer_address_save_before">
+        <observer name="centraliza_connector_record_customer_address" instance="Centraliza\Connector\Entity\Customer\Observer\RecordAddress"/>
+    </event>
+    <event name="customer_address_save_after">
+        <observer name="centraliza_connector_record_customer_address" instance="Centraliza\Connector\Entity\Customer\Observer\RecordAddress"/>
+    </event>
+    <event name="customer_address_delete_before">
+        <observer name="centraliza_connector_record_customer_address" instance="Centraliza\Connector\Entity\Customer\Observer\RecordAddress"/>
+    </event>
+    <event name="customer_address_delete_after">
+        <observer name="centraliza_connector_record_customer_address" instance="Centraliza\Connector\Entity\Customer\Observer\RecordAddress"/>
+    </event>
+    <event name="customer_group_save_after">
+        <observer name="centraliza_connector_record_customer_group" instance="Centraliza\Connector\Entity\CustomerGroup\Observer\RecordGroup"/>
+    </event>
+    <event name="customer_group_delete_after">
+        <observer name="centraliza_connector_record_customer_group" instance="Centraliza\Connector\Entity\CustomerGroup\Observer\RecordGroup"/>
+    </event>
+    <event name="sales_order_save_after">
+        <observer name="centraliza_connector_record_order" instance="Centraliza\Connector\Entity\Order\Observer\RecordOrder"/>
+    </event>
+    <event name="sales_order_invoice_save_after">
+        <observer name="centraliza_connector_record_order_part" instance="Centraliza\Connector\Entity\Order\Observer\RecordOrderPart"/>
+    </event>
+    <event name="sales_order_shipment_save_after">
+        <observer name="centraliza_connector_record_order_part" instance="Centraliza\Connector\Entity\Order\Observer\RecordOrderPart"/>
+    </event>
+    <event name="sales_order_creditmemo_save_after">
+        <observer name="centraliza_connector_record_order_part" instance="Centraliza\Connector\Entity\Order\Observer\RecordOrderPart"/>
+    </event>
+    <event name="sales_order_shipment_track_save_after">
+        <observer name="centraliza_connector_record_order_part" instance="Centraliza\Connector\Entity\Order\Observer\RecordOrderPart"/>
+    </event>
+    <event name="sales_order_shipment_track_delete_after">
+        <observer name="centraliza_connector_record_order_part" instance="Centraliza\Connector\Entity\Order\Observer\RecordOrderPart"/>
+    </event>
+    <event name="sales_order_status_history_save_after">
+        <observer name="centraliza_connector_record_order_part" instance="Centraliza\Connector\Entity\Order\Observer\RecordOrderPart"/>
+    </event>
+    <event name="sales_order_address_save_after">
+        <observer name="centraliza_connector_record_order_part" instance="Centraliza\Connector\Entity\Order\Observer\RecordOrderPart"/>
+    </event>
+    <event name="sales_quote_save_after">
+        <observer name="centraliza_connector_record_cart" instance="Centraliza\Connector\Entity\Cart\Observer\RecordCart"/>
+    </event>
+    <event name="sales_quote_delete_after">
+        <observer name="centraliza_connector_record_cart" instance="Centraliza\Connector\Entity\Cart\Observer\RecordCart"/>
+    </event>
+    <event name="sales_quote_item_save_after">
+        <observer name="centraliza_connector_record_cart_part" instance="Centraliza\Connector\Entity\Cart\Observer\RecordCartPart"/>
+    </event>
+    <event name="sales_quote_item_delete_after">
+        <observer name="centraliza_connector_record_cart_part" instance="Centraliza\Connector\Entity\Cart\Observer\RecordCartPart"/>
+    </event>
+    <event name="sales_quote_address_save_after">
+        <observer name="centraliza_connector_record_cart_part" instance="Centraliza\Connector\Entity\Cart\Observer\RecordCartPart"/>
+    </event>
 </config>
