@@ -16,6 +16,7 @@ use Centraliza\Connector\Core\Model\OutcomeKind;
 use Centraliza\Connector\Core\Policy\ConnectionEventPolicy;
 use Centraliza\Connector\Core\Port\CircuitStoreInterface;
 use Centraliza\Connector\Core\Port\ClockInterface;
+use Centraliza\Connector\Core\Port\QuarantineStoreInterface;
 use Centraliza\Connector\Core\Port\RetryStoreInterface;
 use Centraliza\Connector\Core\Port\TransportInterface;
 use Centraliza\Connector\Core\Service\Backoff;
@@ -30,7 +31,7 @@ class DeliverEventTest extends TestCase
     private array $held = [];
 
     /** @var array<int, array<int, mixed>> */
-    private array $buried = [];
+    private array $quarantined = [];
 
     private int $sent = 0;
 
@@ -38,7 +39,7 @@ class DeliverEventTest extends TestCase
     {
         self::assertSame(Action::Delivered, $this->service(Outcome::of(OutcomeKind::Accepted))->deliver($this->event(2), 0.0));
         self::assertSame([], $this->held);
-        self::assertSame([], $this->buried);
+        self::assertSame([], $this->quarantined);
     }
 
     public function testAnOutageIsHeldWithOneMoreAttemptAndABackoff(): void
@@ -68,17 +69,17 @@ class DeliverEventTest extends TestCase
         self::assertSame(self::NOW + 30, $this->held[0][3]);
     }
 
-    public function testARejectedEventIsBuried(): void
+    public function testARejectedEventGoesToQuarantine(): void
     {
-        self::assertSame(Action::Dead, $this->service(Outcome::of(OutcomeKind::Rejected, 'sku is required'))->deliver($this->event(0), 0.0));
-        self::assertSame('rejected sku is required', $this->buried[0][3]);
+        self::assertSame(Action::Quarantine, $this->service(Outcome::of(OutcomeKind::Rejected, 'sku is required'))->deliver($this->event(0), 0.0));
+        self::assertSame('rejected sku is required', $this->quarantined[0][3]);
         self::assertSame([], $this->held);
     }
 
-    public function testTheLastAttemptOfAnOutageIsBuried(): void
+    public function testTheLastAttemptOfAnOutageGoesToQuarantine(): void
     {
-        self::assertSame(Action::Dead, $this->service(Outcome::unavailable())->deliver($this->event(7), 0.0));
-        self::assertSame(8, $this->buried[0][2]);
+        self::assertSame(Action::Quarantine, $this->service(Outcome::unavailable())->deliver($this->event(7), 0.0));
+        self::assertSame(8, $this->quarantined[0][2]);
     }
 
     public function testWithTheCircuitOpenNothingIsSentAndNoAttemptIsSpent(): void
@@ -117,8 +118,9 @@ class DeliverEventTest extends TestCase
         $retry->method('hold')->willReturnCallback(function (...$args): void {
             $this->held[] = $args;
         });
-        $retry->method('bury')->willReturnCallback(function (...$args): void {
-            $this->buried[] = $args;
+        $quarantine = $this->createMock(QuarantineStoreInterface::class);
+        $quarantine->method('quarantine')->willReturnCallback(function (...$args): void {
+            $this->quarantined[] = $args;
         });
         $store = new class implements CircuitStoreInterface {
             private ?CircuitState $state = null;
@@ -141,6 +143,7 @@ class DeliverEventTest extends TestCase
             $transport,
             new ConnectionEventPolicy(new Backoff(30, 3600), 8),
             $retry,
+            $quarantine,
             $clock
         );
     }

@@ -28,9 +28,9 @@ class ConnectionEventPolicyTest extends TestCase
         self::assertSame(Action::Delivered, $this->policy->decide(Outcome::of(OutcomeKind::Accepted), 3, 0.0)->action);
     }
 
-    public function testARejectedEventDiesAtOnce(): void
+    public function testARejectedEventIsQuarantinedAtOnce(): void
     {
-        self::assertSame(Action::Dead, $this->policy->decide(Outcome::of(OutcomeKind::Rejected), 1, 0.0)->action);
+        self::assertSame(Action::Quarantine, $this->policy->decide(Outcome::of(OutcomeKind::Rejected), 1, 0.0)->action);
     }
 
     /**
@@ -70,9 +70,9 @@ class ConnectionEventPolicyTest extends TestCase
         self::assertSame(30, $this->policy->decide(Outcome::unavailable(5), 1, 1.0)->delaySeconds);
     }
 
-    public function testAnOutageDiesOnlyAfterTheLastAttempt(): void
+    public function testAnOutageIsQuarantinedOnlyAfterTheLastAttempt(): void
     {
         self::assertSame(Action::Retry, $this->policy->decide(Outcome::unavailable(), 7, 0.0)->action);
-        self::assertSame(Action::Dead, $this->policy->decide(Outcome::unavailable(), 8, 0.0)->action);
+        self::assertSame(Action::Quarantine, $this->policy->decide(Outcome::unavailable(), 8, 0.0)->action);
     }
 }

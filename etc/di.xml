@@ -3,6 +3,7 @@
     <preference for="Centraliza\Connector\Core\Port\ClockInterface" type="Centraliza\Connector\Infra\Time\SystemClock"/>
     <preference for="Centraliza\Connector\Core\Port\CircuitStoreInterface" type="Centraliza\Connector\Infra\Persistence\CircuitStore"/>
     <preference for="Centraliza\Connector\Core\Port\RetryStoreInterface" type="Centraliza\Connector\Infra\Persistence\RetryStore"/>
+    <preference for="Centraliza\Connector\Core\Port\QuarantineStoreInterface" type="Centraliza\Connector\Infra\Persistence\QuarantineStore"/>
     <preference for="Centraliza\Connector\Core\Policy\DeliveryPolicyInterface" type="Centraliza\Connector\Core\Policy\ConnectionEventPolicy"/>
     <preference for="Centraliza\Connector\Core\Port\ChangeRecorderInterface" type="Centraliza\Connector\Capture\Collector"/>
     <preference for="Centraliza\Connector\Core\Port\EventPublisherInterface" type="Centraliza\Connector\Infra\Queue\GuardedPublisher"/>
@@ -116,6 +117,22 @@
     </type>
     <type name="Magento\Inventory\Model\SourceItem\Command\DecrementSourceItemQty">
         <plugin name="centraliza_connector_record_source_item_decrement" type="Centraliza\Connector\Entity\Stock\Plugin\RecordSourceItemDecrement"/>
+    </type>
+
+    <!-- Commands are built on every bin/magento run; the queue stack only when one of them publishes. -->
+    <type name="Centraliza\Connector\Console\Command\QuarantineRetry">
+        <arguments>
+            <argument name="publisher" xsi:type="object">Centraliza\Connector\Infra\Queue\QueuePublisher\Proxy</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Framework\Console\CommandListInterface">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="centraliza_connector_quarantine_list" xsi:type="object">Centraliza\Connector\Console\Command\QuarantineList</item>
+                <item name="centraliza_connector_quarantine_retry" xsi:type="object">Centraliza\Connector\Console\Command\QuarantineRetry</item>
+                <item name="centraliza_connector_quarantine_discard" xsi:type="object">Centraliza\Connector\Console\Command\QuarantineDiscard</item>
+            </argument>
+        </arguments>
     </type>
 
     <type name="Magento\Framework\DB\Adapter\AdapterInterface">

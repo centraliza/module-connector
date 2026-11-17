@@ -12,6 +12,6 @@ enum Action: string
     case Retry = 'retry';
     /** Wait without spending an attempt: the problem is the key or the route, not the event. */
     case Postpone = 'postpone';
-    /** Give up; an admin has to look at it. */
-    case Dead = 'dead';
+    /** Stop trying and set the event aside until a person reviews it. */
+    case Quarantine = 'quarantine';
 }

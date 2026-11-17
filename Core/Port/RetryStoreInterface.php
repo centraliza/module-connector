@@ -21,11 +21,6 @@ interface RetryStoreInterface
     public function hold(ConnectionEvent $event, string $lane, int $attempts, int $dueAt, string $lastError = ''): void;
 
     /**
-     * Keeps the event for an admin to look at; it is never returned by due().
-     */
-    public function bury(ConnectionEvent $event, string $lane, int $attempts, string $lastError): void;
-
-    /**
      * Events whose wait is over, oldest first. They stay stored until forget().
      *
      * @return HeldEvent[]

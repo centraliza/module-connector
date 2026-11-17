@@ -12,7 +12,7 @@
             <column name="scope"/>
         </constraint>
     </table>
-    <table name="centraliza_connector_retry" resource="default" engine="innodb" comment="Centraliza Connector events waiting for a retry, or dead">
+    <table name="centraliza_connector_retry" resource="default" engine="innodb" comment="Centraliza Connector events waiting for their next attempt">
         <column xsi:type="int" name="retry_id" unsigned="true" nullable="false" identity="true" comment="Retry ID"/>
         <column xsi:type="varchar" name="idempotency_key" length="191" nullable="false" comment="Idempotency key sent to Centraliza"/>
         <column xsi:type="varchar" name="stream" length="64" nullable="false" comment="Stream"/>
@@ -22,7 +22,6 @@
         <column xsi:type="varchar" name="lane" length="32" nullable="false" comment="Queue lane"/>
         <column xsi:type="smallint" name="attempts" unsigned="true" nullable="false" default="0" comment="Failed attempts"/>
         <column xsi:type="int" name="next_attempt_at" unsigned="true" nullable="false" default="0" comment="Unix seconds"/>
-        <column xsi:type="varchar" name="status" length="16" nullable="false" default="pending" comment="pending or dead"/>
         <column xsi:type="varchar" name="last_error" length="255" nullable="false" default="" comment="Last error"/>
         <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
@@ -31,9 +30,26 @@
         <constraint xsi:type="unique" referenceId="CENTRALIZA_CONNECTOR_RETRY_IDEMPOTENCY_KEY">
             <column name="idempotency_key"/>
         </constraint>
-        <index referenceId="CENTRALIZA_CONNECTOR_RETRY_STATUS_NEXT_ATTEMPT_AT" indexType="btree">
-            <column name="status"/>
+        <index referenceId="CENTRALIZA_CONNECTOR_RETRY_NEXT_ATTEMPT_AT" indexType="btree">
             <column name="next_attempt_at"/>
         </index>
+    </table>
+    <table name="centraliza_connector_quarantine" resource="default" engine="innodb" comment="Centraliza Connector events that delivery gave up on, waiting for a person to review">
+        <column xsi:type="int" name="quarantine_id" unsigned="true" nullable="false" identity="true" comment="Quarantine ID"/>
+        <column xsi:type="varchar" name="idempotency_key" length="191" nullable="false" comment="Idempotency key sent to Centraliza"/>
+        <column xsi:type="varchar" name="stream" length="64" nullable="false" comment="Stream"/>
+        <column xsi:type="varchar" name="verb" length="16" nullable="false" comment="created, updated or deleted"/>
+        <column xsi:type="text" name="key_json" nullable="false" comment="Key fields of the record"/>
+        <column xsi:type="varchar" name="occurred_at" length="40" nullable="false" comment="ISO 8601"/>
+        <column xsi:type="varchar" name="lane" length="32" nullable="false" comment="Queue lane"/>
+        <column xsi:type="smallint" name="attempts" unsigned="true" nullable="false" default="0" comment="Failed attempts"/>
+        <column xsi:type="varchar" name="reason" length="255" nullable="false" default="" comment="Why delivery gave up"/>
+        <column xsi:type="timestamp" name="quarantined_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Quarantined At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="quarantine_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="CENTRALIZA_CONNECTOR_QUARANTINE_IDEMPOTENCY_KEY">
+            <column name="idempotency_key"/>
+        </constraint>
     </table>
 </schema>

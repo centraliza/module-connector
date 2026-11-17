@@ -24,16 +24,35 @@
             "lane": true,
             "attempts": true,
             "next_attempt_at": true,
-            "status": true,
             "last_error": true,
-            "created_at": true
+            "created_at": true,
+            "status": true
         },
         "index": {
+            "CENTRALIZA_CONNECTOR_RETRY_NEXT_ATTEMPT_AT": true,
             "CENTRALIZA_CONNECTOR_RETRY_STATUS_NEXT_ATTEMPT_AT": true
         },
         "constraint": {
             "PRIMARY": true,
             "CENTRALIZA_CONNECTOR_RETRY_IDEMPOTENCY_KEY": true
+        }
+    },
+    "centraliza_connector_quarantine": {
+        "column": {
+            "quarantine_id": true,
+            "idempotency_key": true,
+            "stream": true,
+            "verb": true,
+            "key_json": true,
+            "occurred_at": true,
+            "lane": true,
+            "attempts": true,
+            "reason": true,
+            "quarantined_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "CENTRALIZA_CONNECTOR_QUARANTINE_IDEMPOTENCY_KEY": true
         }
     }
 }

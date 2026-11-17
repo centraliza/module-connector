@@ -10,6 +10,7 @@ use Centraliza\Connector\Core\Model\HeldEvent;
 use Centraliza\Connector\Core\Model\OutcomeKind;
 use Centraliza\Connector\Core\Policy\DeliveryPolicyInterface;
 use Centraliza\Connector\Core\Port\ClockInterface;
+use Centraliza\Connector\Core\Port\QuarantineStoreInterface;
 use Centraliza\Connector\Core\Port\RetryStoreInterface;
 use Centraliza\Connector\Core\Port\TransportInterface;
 
@@ -28,6 +29,7 @@ final readonly class DeliverEvent
         private TransportInterface $transport,
         private DeliveryPolicyInterface $policy,
         private RetryStoreInterface $retryStore,
+        private QuarantineStoreInterface $quarantine,
         private ClockInterface $clock
     ) {
     }
@@ -74,7 +76,7 @@ final readonly class DeliverEvent
                 $now + max($decision->delaySeconds, self::DEFAULT_POSTPONE_SECONDS),
                 $error
             ),
-            Action::Dead => $this->retryStore->bury($held->event, $held->lane, $attempts, $error),
+            Action::Quarantine => $this->quarantine->quarantine($held->event, $held->lane, $attempts, $error),
         };
 
         return $decision->action;

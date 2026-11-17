@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Centraliza\Connector\Infra\Queue;
 
+use Centraliza\Connector\Core\Model\Action;
 use Centraliza\Connector\Core\Service\DeliverEvent;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -24,7 +25,14 @@ class Consumer
     public function process(string $message): void
     {
         try {
-            $this->deliverEvent->deliver($this->codec->decode($message), mt_rand() / mt_getrandmax());
+            $held = $this->codec->decode($message);
+            if ($this->deliverEvent->deliver($held, mt_rand() / mt_getrandmax()) === Action::Quarantine) {
+                $this->logger->warning('Centraliza Connector quarantined an event.', [
+                    'stream' => $held->event->stream,
+                    'verb' => $held->event->verb->value,
+                    'key' => $held->event->key,
+                ]);
+            }
         } catch (Throwable $e) {
             $this->logger->error('Centraliza Connector could not handle a queue message.', ['exception' => $e]);
         }
