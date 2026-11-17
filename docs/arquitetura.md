@@ -448,7 +448,8 @@ Configuração em Stores > Configuration > Services > Centraliza Connector:
 | `centraliza_connector/general/connection_id_{production,staging}` | global | channel ID (UUID da conexão Magento) de cada ambiente |
 | `centraliza_connector/carts/guests` | website | reporta carrinhos sem cliente; padrão Não |
 | `centraliza_connector/delivery/max_attempts` | global | quantas vezes um evento é enviado antes de ir para a quarentena; padrão 5 |
-| `centraliza_connector/delivery/bulk_quota_floor` | global | requisições por minuto reservadas para as mensagens; os eventos de conexão param quando restam estas; padrão 30 (21 a 59) |
+| `centraliza_connector/delivery/request_limit` | global | requisições por minuto por chave, somando eventos e mensagens; padrão 60; 0 desliga o limite local; acima de 60 vale como 60 enquanto o `Centraliza_Base` estiver habilitado |
+| `centraliza_connector/delivery/bulk_quota_floor` | global | requisições por minuto reservadas para as mensagens; os eventos de conexão param quando restam estas; padrão 30 (de 21 até um a menos que o limite) |
 | `centraliza_connector/general/debug` | global | grava uma linha por requisição de mensagem em `var/log/centraliza.log` |
 | `centraliza_connector/connection/{key_hash,workspace_name,validated_at}_{production,staging}` | global, gravado pelo botão Autenticar | estado da validação da chave de cada ambiente; as mensagens só saem com a chave validada |
 | `centraliza_connector/connection/rejected_keys` | global | chaves que a Centraliza recusou, por hash |
@@ -539,11 +540,11 @@ As condições são criadas no New Relic, em uma policy com notificação para a
 7. Clientes: usar o stream `customers` ou os eventos canônicos `contact.created` e `contact.updated`? Os dois existem e não está dito como se relacionam.
 8. Pedidos: o conector Magento do Centraliza já importa pedidos por polling a cada 15 minutos. Um evento `orders.updated` antecipa essa leitura, ou é ignorado?
 9. A Admin API não tem rota de criação de `locations` nem de `orders` (só leitura e, para pedidos, update e delete). O stream `locations` existe?
-10. Qual é o limite real de `POST /v1/admin/events`: 6.000 por minuto (convenções) ou 60 (guia de API keys)? Os módulos antigos mediram 60 por chave, e este módulo segue esse número: os eventos ficam com ~30 por minuto, o resto fica para as mensagens. Dá para ter um limite maior ou uma cota separada para os eventos?
+10. Qual é o limite real de `POST /v1/admin/events`: 6.000 por minuto (convenções) ou 60 (guia de API keys)? Os módulos antigos mediram 60 por chave, e é o padrão de `request_limit`: os eventos ficam com ~30 por minuto, o resto fica para as mensagens. Dá para ter um limite maior ou uma cota separada para os eventos?
 
 ## 11. Limites conhecidos
 
 - Escrita por SQL direto não gera evento.
 - Um processo morto entre o commit e o publish, com conexão `amqp`, perde o evento. Com conexão `db` isso não acontece, porque o publish está na mesma transação.
 - O módulo não sabe se o Centraliza processou o evento, só que o aceitou (`200`).
-- Vazão: com a cota de 60 requisições por minuto por chave dividida com as mensagens, os eventos saem a no máximo `60 - bulk_quota_floor` por minuto (30 no padrão).
+- Vazão: com a cota por chave dividida com as mensagens, os eventos saem a no máximo `request_limit - bulk_quota_floor` por minuto (30 no padrão, 60 - 30).

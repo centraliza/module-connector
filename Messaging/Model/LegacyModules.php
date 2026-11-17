@@ -20,6 +20,11 @@ class LegacyModules
     public const SALES = 'Centraliza_Sales';
 
     /**
+     * Holds the legacy request limiter, fixed at 60 a minute, in the table the connection events share.
+     */
+    public const BASE = 'Centraliza_Base';
+
+    /**
      * @param ModuleManager $moduleManager
      */
     public function __construct(
@@ -33,5 +38,13 @@ class LegacyModules
     public function areActive(): bool
     {
         return $this->moduleManager->isEnabled(self::SALES);
+    }
+
+    /**
+     * @return bool
+     */
+    public function limiterActive(): bool
+    {
+        return $this->moduleManager->isEnabled(self::BASE);
     }
 }

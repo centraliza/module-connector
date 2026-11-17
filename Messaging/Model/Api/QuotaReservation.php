@@ -9,6 +9,7 @@ namespace Centraliza\Connector\Messaging\Model\Api;
 
 use Centraliza\Connector\Messaging\Api\QuotaReservationInterface;
 use Centraliza\Connector\Messaging\Exception\CentralizaAuthException;
+use Centraliza\Connector\Messaging\Model\LegacyModules;
 use Centraliza\Connector\Messaging\Model\ResourceModel\RateLimit;
 use GuzzleHttp\Psr7\UriResolver;
 use InvalidArgumentException;
@@ -19,6 +20,27 @@ use Throwable;
 class QuotaReservation implements QuotaReservationInterface
 {
     public const PATH_BULK_QUOTA_FLOOR = 'centraliza_connector/delivery/bulk_quota_floor';
+
+    /**
+     * Requests per minute per key; 0 turns the local limit off.
+     */
+    public const PATH_REQUEST_LIMIT = 'centraliza_connector/delivery/request_limit';
+
+    /**
+     * Measured by the legacy modules, which keep it fixed in their own limiter.
+     */
+    public const DEFAULT_LIMIT = 60;
+
+    /**
+     * The bulk floor must stay under the limit and over the marketing floor (20), so 21 is the lowest bulk floor
+     * and 22 the lowest limit that still leaves the connection events one request.
+     */
+    public const MIN_LIMIT = 22;
+
+    /**
+     * Shown as what is left while the limit is off.
+     */
+    private const UNLIMITED_REMAINING = 1000;
 
     /**
      * A person is waiting on the screen: may spend the last request.
@@ -36,11 +58,11 @@ class QuotaReservation implements QuotaReservationInterface
     private const MARKETING_FLOOR = 20;
 
     /**
-     * An estimate, hence configurable; 21 to 59 keeps connection events stopping before marketing and still sending.
+     * An estimate, hence configurable; from 21 to one under the limit keeps connection events stopping before
+     * marketing and still sending.
      */
     private const DEFAULT_BULK_FLOOR = 30;
-    private const MIN_BULK_FLOOR = 21;
-    private const MAX_BULK_FLOOR = 59;
+    public const MIN_BULK_FLOOR = 21;
 
     /**
      * Each check spends the key's shared quota: repeated checks could starve customer messages (user decision).
@@ -60,11 +82,13 @@ class QuotaReservation implements QuotaReservationInterface
      * @param RateLimit $rateLimitResource
      * @param ScopeConfigInterface $scopeConfig
      * @param LoggerInterface $logger
+     * @param LegacyModules $legacyModules
      */
     public function __construct(
         private readonly RateLimit $rateLimitResource,
         private readonly ScopeConfigInterface $scopeConfig,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly LegacyModules $legacyModules
     ) {
     }
 
@@ -76,11 +100,21 @@ class QuotaReservation implements QuotaReservationInterface
      */
     public function reserve(string $apiKeyHash, string $priority, string $route): bool
     {
+        $route = $this->normaliseRoute($route);
+        $limit = $this->getLimit();
+        if ($limit === null) {
+            // An unknown priority still fails, as it does with a limit.
+            $this->getFloor($priority, self::DEFAULT_LIMIT);
+
+            return !$this->rateLimitResource->isPaused($apiKeyHash, $route, $priority !== self::PRIORITY_INTERACTIVE);
+        }
+
         return $this->rateLimitResource->reserve(
             $apiKeyHash,
-            $this->getFloor($priority),
-            $this->normaliseRoute($route),
-            $priority !== self::PRIORITY_INTERACTIVE
+            $this->getFloor($priority, $limit),
+            $route,
+            $priority !== self::PRIORITY_INTERACTIVE,
+            $limit
         );
     }
 
@@ -91,6 +125,10 @@ class QuotaReservation implements QuotaReservationInterface
      */
     public function consume(string $apiKeyHash, int $requests): void
     {
+        if ($this->getLimit() === null) {
+            return;
+        }
+
         $this->rateLimitResource->consume($apiKeyHash, $requests);
     }
 
@@ -101,7 +139,12 @@ class QuotaReservation implements QuotaReservationInterface
      */
     public function recordServerRemaining(string $apiKeyHash, int $remaining): void
     {
-        $this->rateLimitResource->recordServerRemaining($apiKeyHash, $remaining);
+        $limit = $this->getLimit();
+        if ($limit === null) {
+            return;
+        }
+
+        $this->rateLimitResource->recordServerRemaining($apiKeyHash, $remaining, $limit);
     }
 
     /**
@@ -161,7 +204,16 @@ class QuotaReservation implements QuotaReservationInterface
      */
     public function getRemaining(string $apiKeyHash, string $priority): int
     {
-        return $this->rateLimitResource->getRemaining($apiKeyHash, $priority !== self::PRIORITY_INTERACTIVE);
+        $limit = $this->getLimit();
+        if ($limit === null) {
+            return $this->rateLimitResource->getRemaining(
+                $apiKeyHash,
+                $priority !== self::PRIORITY_INTERACTIVE,
+                self::UNLIMITED_REMAINING
+            ) === 0 ? 0 : self::UNLIMITED_REMAINING;
+        }
+
+        return $this->rateLimitResource->getRemaining($apiKeyHash, $priority !== self::PRIORITY_INTERACTIVE, $limit);
     }
 
     /**
@@ -175,7 +227,8 @@ class QuotaReservation implements QuotaReservationInterface
         return $this->rateLimitResource->getWaitSeconds(
             $apiKeyHash,
             $this->normaliseRoute($route),
-            $priority !== self::PRIORITY_INTERACTIVE
+            $priority !== self::PRIORITY_INTERACTIVE,
+            $this->getLimit() !== null
         );
     }
 
@@ -239,30 +292,63 @@ class QuotaReservation implements QuotaReservationInterface
     }
 
     /**
+     * Requests per minute per key, or null when the local limit is off.
+     *
+     * While the legacy Centraliza_Base is enabled it counts in the same table against its fixed 60: a higher
+     * limit here would let the connection events spend what its messages wait for, so 60 holds until then.
+     *
+     * @return int|null
+     */
+    public function getLimit(): ?int
+    {
+        $configured = $this->scopeConfig->getValue(self::PATH_REQUEST_LIMIT);
+        if ($configured === null || trim((string) $configured) === '') {
+            $limit = self::DEFAULT_LIMIT;
+        } else {
+            $limit = (int) $configured;
+        }
+        if ($limit <= 0) {
+            return null;
+        }
+
+        // CLI or SQL writes skip the admin validation.
+        if ($limit < self::MIN_LIMIT) {
+            $limit = self::DEFAULT_LIMIT;
+        }
+        if ($this->legacyModules->limiterActive()) {
+            $limit = min($limit, self::DEFAULT_LIMIT);
+        }
+
+        return $limit;
+    }
+
+    /**
      * @param string $priority
+     * @param int $limit
      * @return int
      */
-    private function getFloor(string $priority): int
+    private function getFloor(string $priority, int $limit): int
     {
         return match ($priority) {
             self::PRIORITY_INTERACTIVE => self::INTERACTIVE_FLOOR,
             self::PRIORITY_TRANSACTIONAL => self::TRANSACTIONAL_FLOOR,
             self::PRIORITY_MARKETING => self::MARKETING_FLOOR,
-            self::PRIORITY_BULK => $this->getBulkFloor(),
+            self::PRIORITY_BULK => $this->getBulkFloor($limit),
             default => throw new InvalidArgumentException(sprintf(self::UNKNOWN_PRIORITY, $priority)),
         };
     }
 
     /**
+     * @param int $limit
      * @return int
      */
-    private function getBulkFloor(): int
+    private function getBulkFloor(int $limit): int
     {
         $floor = (int) $this->scopeConfig->getValue(self::PATH_BULK_QUOTA_FLOOR);
 
-        // CLI or SQL writes skip the admin validation.
-        if ($floor < self::MIN_BULK_FLOOR || $floor > self::MAX_BULK_FLOOR) {
-            return self::DEFAULT_BULK_FLOOR;
+        // CLI or SQL writes skip the admin validation, and the limit can be lowered after the floor was saved.
+        if ($floor < self::MIN_BULK_FLOOR || $floor >= $limit) {
+            return max(self::MIN_BULK_FLOOR, min(self::DEFAULT_BULK_FLOOR, $limit - 1));
         }
 
         return $floor;

@@ -55,16 +55,22 @@ Conferido no banco local com o diff do declarative schema (sem executar nada): c
 
 ## Cota compartilhada
 
-A Centraliza aceita 60 requisições por minuto por chave (medido pelos antigos), somando todas as rotas. As mensagens e os eventos de conexão usam a mesma chave e a mesma rota (`admin/events`). Por isso os dois reservam na mesma tabela (`centraliza_rate_limit`), com prioridades:
+A Centraliza limita as requisições por minuto por chave, somando todas as rotas; os antigos mediram 60. As mensagens e os eventos de conexão usam a mesma chave e a mesma rota (`admin/events`), por isso reservam na mesma tabela (`centraliza_rate_limit`), com prioridades:
 
 | Prioridade | Quem | Para quando restam |
 |---|---|---|
 | interactive | validação da chave no admin | 0 |
 | transactional | mensagens de pedido | 10 |
 | marketing | carrinho abandonado | 20 |
-| bulk | eventos de conexão (`Infra\Http\SharedQuota`) | `bulk_quota_floor`, padrão 30 (21 a 59) |
+| bulk | eventos de conexão (`Infra\Http\SharedQuota`) | `bulk_quota_floor`, padrão 30 (de 21 até um a menos que o limite) |
 
-Os eventos de conexão ficam então com no máximo ~30 por minuto. Quando a cota acaba, o consumer espera o fim da janela (até 60 s) e tenta de novo; se ainda não houver, ou se a chave estiver pausada, o evento volta para a tabela de retry sem gastar tentativa. Um 401 dos eventos pausa a chave inteira por 15 min, mensagens incluídas, porque elas também seriam recusadas. 403 e 404 dos eventos não pausam a rota: nos eventos eles podem ser channel ID errado, e pausar `admin/events` calaria as mensagens de pedido.
+O limite é configurável em `centraliza_connector/delivery/request_limit` (admin: Delivery > Request Limit Per Minute, padrão 60):
+
+- **Um número** (22 ou mais): a janela de 60 s conta até ele. Os pisos das mensagens são absolutos: com 600, os eventos de conexão usam até 570 e as mensagens continuam com 30 reservadas. Um piso que não cabe no limite (salvo por CLI, ou limite reduzido depois) volta para 30, ou para um a menos que o limite.
+- **0**: sem limite local. Nada é contado; só um 429 da Centraliza (bloqueio de até 60 s) ou uma chave recusada seguram as requisições.
+- **Enquanto o `Centraliza_Base` estiver habilitado**, um valor acima de 60 vale como 60. O limitador antigo conta com 60 fixo na mesma linha, e um limite maior aqui deixaria os eventos de conexão gastarem o que o WhatsApp antigo espera. O valor salvo passa a valer sozinho quando os antigos forem desabilitados.
+
+Com o padrão, os eventos de conexão ficam com no máximo ~30 por minuto. Quando a cota acaba, o consumer espera o fim da janela (até 60 s) e tenta de novo. Se ainda não houver requisição livre, ou se a chave estiver pausada, o evento volta para a tabela de retry sem gastar tentativa. Um 401 dos eventos pausa a chave inteira por 15 min, mensagens incluídas, porque elas também seriam recusadas. 403 e 404 dos eventos não pausam a rota: nos eventos eles podem ser channel ID errado, e pausar `admin/events` calaria as mensagens de pedido.
 
 ## Levantamento das funcionalidades
 
@@ -116,6 +122,6 @@ Produto, preço e estoque por mview (`centraliza_catalog_product`, `_inventory`,
 
 ## Perguntas para o time da Centraliza
 
-1. 60 requisições por minuto por chave, divididas com o WhatsApp, deixam os eventos de conexão com ~30 por minuto: uma carga inicial de ~3 mil produtos (~9 mil eventos entre produto, preço e estoque) leva horas. Dá para ter um limite maior ou uma cota separada para os eventos?
+1. 60 requisições por minuto por chave, divididas com o WhatsApp, deixam os eventos de conexão com ~30 por minuto: uma carga inicial de ~3 mil produtos (~9 mil eventos entre produto, preço e estoque) leva horas. Qual é o limite real da chave? Dá para ter um limite maior ou uma cota separada para os eventos? O valor que eles informarem vai em `request_limit`.
 2. `order.created` ainda é contrato proposto, não confirmado.
 3. Os antigos mandam `marketing_opt_in: true` sempre, com um comentário de que isso não serve para produção (LGPD), e está assim em produção hoje.

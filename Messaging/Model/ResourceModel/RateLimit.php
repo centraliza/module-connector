@@ -14,9 +14,9 @@ use Magento\Framework\Model\ResourceModel\Db\AbstractDb;
 class RateLimit extends AbstractDb
 {
     /**
-     * Platform limit (measured): 60 requests per key in a fixed 60 s window from the first request.
+     * Platform limit (measured): 60 requests per key in a fixed 60 s window from the first request. The limit
+     * itself is configurable (QuotaReservation::PATH_REQUEST_LIMIT) and passed to each call; the window is not.
      */
-    public const LIMIT_PER_WINDOW = 60;
     public const WINDOW_SECONDS = 60;
 
     /**
@@ -65,9 +65,10 @@ class RateLimit extends AbstractDb
      * @param int $floor
      * @param string $route relative API path of the request
      * @param bool $pausedByRefusals false for interactive calls, which a refusal never pauses
+     * @param int $limit requests per window
      * @return bool
      */
-    public function reserve(string $apiKeyHash, int $floor, string $route, bool $pausedByRefusals): bool
+    public function reserve(string $apiKeyHash, int $floor, string $route, bool $pausedByRefusals, int $limit): bool
     {
         $connection = $this->getConnection();
         $this->ensureRow($apiKeyHash);
@@ -75,7 +76,7 @@ class RateLimit extends AbstractDb
         $expired = sprintf(self::WINDOW_EXPIRED, self::WINDOW_SECONDS);
         $where = [
             'api_key_hash = ?' => $apiKeyHash,
-            $connection->quoteInto("({$expired} OR used < ?)", self::LIMIT_PER_WINDOW - $floor),
+            $connection->quoteInto("({$expired} OR used < ?)", $limit - $floor),
             '(blocked_until IS NULL OR blocked_until <= NOW())',
         ];
         if ($pausedByRefusals) {
@@ -124,12 +125,13 @@ class RateLimit extends AbstractDb
     /**
      * @param string $apiKeyHash
      * @param int $remaining
+     * @param int $limit requests per window
      * @return void
      */
-    public function recordServerRemaining(string $apiKeyHash, int $remaining): void
+    public function recordServerRemaining(string $apiKeyHash, int $remaining, int $limit): void
     {
         $connection = $this->getConnection();
-        $spent = self::LIMIT_PER_WINDOW - max(0, min($remaining, self::LIMIT_PER_WINDOW));
+        $spent = $limit - max(0, min($remaining, $limit));
 
         // Only ever raised: an older reading must not undo another process's reservation.
         $connection->update(
@@ -223,9 +225,10 @@ class RateLimit extends AbstractDb
     /**
      * @param string $apiKeyHash
      * @param bool $pausedByRefusals false for interactive calls, which a refusal never pauses
+     * @param int $limit requests per window
      * @return int requests left in the window; 0 while the key is blocked or, when it pauses the caller, refused
      */
-    public function getRemaining(string $apiKeyHash, bool $pausedByRefusals): int
+    public function getRemaining(string $apiKeyHash, bool $pausedByRefusals, int $limit): int
     {
         $connection = $this->getConnection();
         $pause = '(blocked_until IS NOT NULL AND blocked_until > NOW())';
@@ -237,14 +240,14 @@ class RateLimit extends AbstractDb
                 'SELECT IF(%1$s, 0, IF(%2$s, %3$d, GREATEST(0, %3$d - used)))',
                 $pause,
                 sprintf(self::WINDOW_EXPIRED, self::WINDOW_SECONDS),
-                self::LIMIT_PER_WINDOW
+                $limit
             )
             . ' FROM ' . $connection->quoteIdentifier($this->getMainTable())
             . ' WHERE api_key_hash = ?',
             [$apiKeyHash]
         );
         if ($remaining === false) {
-            return self::LIMIT_PER_WINDOW;
+            return $limit;
         }
 
         return (int) $remaining;
@@ -254,10 +257,15 @@ class RateLimit extends AbstractDb
      * @param string $apiKeyHash
      * @param string $route
      * @param bool $pausedByRefusals false for interactive calls, which a refusal never pauses
+     * @param bool $windowCounts false with no request limit: only the block and the refusals hold a request
      * @return int seconds until the window, the block and, when they pause the caller, the refusals end
      */
-    public function getWaitSeconds(string $apiKeyHash, string $route, bool $pausedByRefusals): int
-    {
+    public function getWaitSeconds(
+        string $apiKeyHash,
+        string $route,
+        bool $pausedByRefusals,
+        bool $windowCounts = true
+    ): int {
         $connection = $this->getConnection();
         $pauseEnds = ['COALESCE(TIMESTAMPDIFF(SECOND, NOW(), blocked_until), 0)'];
         if ($pausedByRefusals) {
@@ -268,14 +276,15 @@ class RateLimit extends AbstractDb
             );
             $pauseEnds[] = 'COALESCE((' . $routeRefusal . '), 0)';
         }
-        $seconds = $connection->fetchOne(
-            sprintf(
-                'SELECT GREATEST(0, IF(%s, 0, TIMESTAMPDIFF(SECOND, NOW(), window_started_at + INTERVAL %d SECOND)),'
-                . ' %s)',
+        $windowEnd = $windowCounts
+            ? sprintf(
+                'IF(%s, 0, TIMESTAMPDIFF(SECOND, NOW(), window_started_at + INTERVAL %d SECOND))',
                 sprintf(self::WINDOW_EXPIRED, self::WINDOW_SECONDS),
-                self::WINDOW_SECONDS,
-                implode(', ', $pauseEnds)
+                self::WINDOW_SECONDS
             )
+            : '0';
+        $seconds = $connection->fetchOne(
+            sprintf('SELECT GREATEST(0, %s, %s)', $windowEnd, implode(', ', $pauseEnds))
             . ' FROM ' . $connection->quoteIdentifier($this->getMainTable())
             . ' WHERE api_key_hash = ?',
             [$apiKeyHash]
@@ -285,6 +294,35 @@ class RateLimit extends AbstractDb
         }
 
         return (int) $seconds;
+    }
+
+    /**
+     * With no request limit nothing is counted: a request waits only for a 429 block or, when they pause the
+     * caller, a refusal.
+     *
+     * @param string $apiKeyHash
+     * @param string $route
+     * @param bool $pausedByRefusals false for interactive calls, which a refusal never pauses
+     * @return bool
+     */
+    public function isPaused(string $apiKeyHash, string $route, bool $pausedByRefusals): bool
+    {
+        $connection = $this->getConnection();
+        $pause = ['(blocked_until IS NOT NULL AND blocked_until > NOW())'];
+        if ($pausedByRefusals) {
+            $pause[] = '(key_refused_until IS NOT NULL AND key_refused_until > NOW())';
+            $routeRefusal = $this->selectRouteRefusal($route, new Expression('1'))
+                ->where('route_refusal.refused_until > NOW()');
+            $pause[] = 'EXISTS (' . $routeRefusal . ')';
+        }
+
+        $paused = $connection->fetchOne(
+            'SELECT 1 FROM ' . $connection->quoteIdentifier($this->getMainTable())
+            . ' WHERE api_key_hash = ? AND (' . implode(' OR ', $pause) . ')',
+            [$apiKeyHash]
+        );
+
+        return $paused !== false;
     }
 
     /**

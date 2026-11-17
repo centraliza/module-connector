@@ -79,10 +79,20 @@
                     <validate>required-entry validate-digits validate-greater-than-zero</validate>
                     <comment>How many times an event is sent while Centraliza is unavailable. Each failure waits longer before the next try; the last one moves the event to quarantine, where it stays until someone reviews it.</comment>
                 </field>
+                <field id="request_limit" translate="label comment" type="text" sortOrder="15" showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                    <label>Request Limit Per Minute</label>
+                    <backend_model>Centraliza\Connector\Messaging\Model\Config\Backend\RequestLimit</backend_model>
+                    <validate>required-entry validate-digits</validate>
+                    <comment>Requests per minute Centraliza allows each API key, counted together for the connection events and the order and cart messages; 60 is the limit measured so far. 0 turns the local limit off: only Centraliza's own answer (429) holds requests back. While the legacy Centraliza modules are enabled, a value above 60 counts as 60: they keep their own limit of 60 in the same count.</comment>
+                </field>
                 <field id="bulk_quota_floor" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
                     <label>Requests Kept For Messages</label>
-                    <validate>required-entry validate-digits validate-digits-range digits-range-21-59</validate>
-                    <comment>Centraliza allows 60 requests a minute per API key, shared by the connection events and the order and cart messages. Connection events stop for the minute when this many are left. Allowed: 21 to 59, so they always stop before abandoned-cart reminders, which stop with 20 left.</comment>
+                    <backend_model>Centraliza\Connector\Messaging\Model\Config\Backend\BulkQuotaFloor</backend_model>
+                    <validate>required-entry validate-digits</validate>
+                    <comment>Connection events stop for the minute when this many requests of the limit are left. From 21 to one under the limit, so they always stop before abandoned-cart reminders, which stop with 20 left.</comment>
+                    <depends>
+                        <field id="request_limit" negative="1">0</field>
+                    </depends>
                 </field>
             </group>
         </section>

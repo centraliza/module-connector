@@ -10,10 +10,11 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
- * Centraliza allows each API key 60 requests a minute, counted together for every route. The order and cart
- * messages use the same key, so the connection events reserve their request in the same table
- * (centraliza_rate_limit) with the lowest priority, "bulk": they stop for the minute when only the requests kept
- * for the messages are left (centraliza_connector/delivery/bulk_quota_floor).
+ * Centraliza allows each API key a number of requests a minute (centraliza_connector/delivery/request_limit,
+ * 60 measured), counted together for every route. The order and cart messages use the same key, so the
+ * connection events reserve their request in the same table (centraliza_rate_limit) with the lowest priority,
+ * "bulk": they stop for the minute when only the requests kept for the messages are left
+ * (centraliza_connector/delivery/bulk_quota_floor). With the limit off, only a 429 or a refused key holds them.
  */
 class SharedQuota
 {

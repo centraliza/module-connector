@@ -20,6 +20,7 @@
             </carts>
             <delivery>
                 <max_attempts>5</max_attempts>
+                <request_limit>60</request_limit>
                 <bulk_quota_floor>30</bulk_quota_floor>
             </delivery>
         </centraliza_connector>
