@@ -537,12 +537,12 @@ As condições são criadas no New Relic, em uma policy com notificação para a
 
 ## 10. Pendências com o time do Centraliza
 
-1. Confirmar os streams propostos na seção 2 e os campos de chave de cada um.
+1. Confirmar os streams propostos na seção 2 e os campos de chave de cada um. **Teste em staging (17/11/2026):** `products`, `prices` e `stock` são aceitos (200). `locations`, `customers`, `customer_groups`, `orders` e `carts` voltam 422 "The connection has no stream named …": precisam ser criados na conexão Magento do lado da Centraliza. Os erros de `contact` que vêm junto são consequência: um tipo que não é stream da conexão é tratado como evento comum, que exige contato; os streams aceitos não pedem contato.
 2. O guia do conector Magento descreve produtos e estoque indo do Centraliza para o Magento. Confirmar que os streams `products`, `prices` e `stock` aceitam o Magento como origem.
 3. `created` e `updated` têm tratamento diferente, ou basta enviar `updated`?
 4. A releitura usa a REST do Magento com o token de integração do conector? Para `carts` e `locations` o token precisa dos recursos `Magento_Cart::manage` e `Magento_InventoryApi::source`.
 5. Para `.deleted`, qual política de remoção se aplica a cada stream?
-6. O campo `connection` é o `id` do canal devolvido por `GET /v1/admin/channels`? A resposta dessa rota não traz um id de conexão separado.
+6. ~~O campo `connection` é o `id` do canal devolvido por `GET /v1/admin/channels`?~~ Não: esse `id` é o código do tipo de canal (`magento`), e a API recusa ("must be a valid UUID"). O `connection` é o UUID da conexão, que aparece no painel (Settings > Channels > Magento) e não é exposto pela Admin API (`/v1/admin/connections` dá 404).
 7. Clientes: usar o stream `customers` ou os eventos canônicos `contact.created` e `contact.updated`? Os dois existem e não está dito como se relacionam.
 8. Pedidos: o conector Magento do Centraliza já importa pedidos por polling a cada 15 minutos. Um evento `orders.updated` antecipa essa leitura, ou é ignorado?
 9. A Admin API não tem rota de criação de `locations` nem de `orders` (só leitura e, para pedidos, update e delete). O stream `locations` existe?
