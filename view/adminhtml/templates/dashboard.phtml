@@ -1,0 +1,220 @@
+<?php
+/**
+ * @var \Centraliza\Connector\Block\Adminhtml\Dashboard $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+declare(strict_types=1);
+
+$websiteName = $block->getWebsiteName();
+$circuit = $block->getCircuit();
+$queue = $block->getQueue();
+$quarantined = $block->getQuarantined();
+$lastDay = $block->getLastDay();
+$workspace = $block->getCheckedWorkspace();
+$limit = $block->getRequestLimit();
+$formKey = $block->getFormKey();
+?>
+<style>
+    .centraliza-dashboard section { margin-bottom: 3rem; }
+    .centraliza-dashboard h2 { font-size: 2rem; font-weight: 600; margin-bottom: 1.2rem; }
+    .centraliza-dashboard .centraliza-status { display: grid; grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); gap: 1rem; }
+    .centraliza-dashboard .centraliza-card { border: 1px solid #e3e3e3; padding: 1.2rem 1.5rem; background: #fff; }
+    .centraliza-dashboard .centraliza-card dt { color: #666; font-size: 1.2rem; margin-bottom: .4rem; }
+    .centraliza-dashboard .centraliza-card dd { font-size: 1.6rem; font-weight: 600; margin: 0; }
+    .centraliza-dashboard .centraliza-ok { color: #006400; }
+    .centraliza-dashboard .centraliza-warn { color: #eb5202; }
+    .centraliza-dashboard .centraliza-bad { color: #e22626; }
+    .centraliza-dashboard form { display: inline; }
+    .centraliza-dashboard .data-grid td { vertical-align: middle; }
+    .centraliza-dashboard .centraliza-links a { margin-right: 2rem; }
+</style>
+<div class="centraliza-dashboard">
+    <p class="centraliza-links">
+        <a href="<?= $escaper->escapeUrl($block->getDeliveriesUrl()) ?>"><?= $escaper->escapeHtml(__('See the sent requests')) ?></a>
+        <a href="<?= $escaper->escapeUrl($block->getConfigUrl()) ?>"><?= $escaper->escapeHtml(__('Configuration')) ?></a>
+    </p>
+
+    <section>
+        <h2><?= $escaper->escapeHtml(__('Connection')) ?></h2>
+        <?php if ($websiteName === null): ?>
+            <div class="message message-warning">
+                <?= $escaper->escapeHtml(__('No website reports to Centraliza. Set "Report changes to Centraliza" to Yes on one website in the configuration.')) ?>
+            </div>
+        <?php endif; ?>
+        <dl class="centraliza-status">
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('Website')) ?></dt>
+                <dd><?= $escaper->escapeHtml($websiteName ?? '—') ?></dd>
+            </div>
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('Environment')) ?></dt>
+                <dd><?= $escaper->escapeHtml($block->getEnvironment() === 'staging' ? 'Staging (app.centraliza.dev)' : 'Production (app.centraliza.ai)') ?></dd>
+            </div>
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('Mode')) ?></dt>
+                <dd class="<?= $block->isLive() ? 'centraliza-ok' : 'centraliza-warn' ?>">
+                    <?= $escaper->escapeHtml($block->isLive() ? __('Live') : __('Simulation (nothing is sent)')) ?>
+                </dd>
+            </div>
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('API key')) ?></dt>
+                <dd class="<?= $workspace !== null ? 'centraliza-ok' : 'centraliza-warn' ?>">
+                    <?= $escaper->escapeHtml($workspace !== null ? __('Checked: %1', $workspace) : __('Not checked')) ?>
+                </dd>
+            </div>
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('Channel ID')) ?></dt>
+                <dd class="<?= $block->getChannelId() !== '' ? '' : 'centraliza-bad' ?>" style="font-size: 1.3rem; word-break: break-all;">
+                    <?= $escaper->escapeHtml($block->getChannelId() !== '' ? $block->getChannelId() : __('Not set')) ?>
+                </dd>
+            </div>
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('Request limit')) ?></dt>
+                <dd><?= $escaper->escapeHtml($limit === null ? __('Off') : __('%1 per minute', $limit)) ?></dd>
+            </div>
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('Circuit breaker')) ?></dt>
+                <dd class="<?= $circuit['status'] === 'closed' ? 'centraliza-ok' : 'centraliza-bad' ?>">
+                    <?= $escaper->escapeHtml(match ($circuit['status']) {
+                        'closed' => __('Closed (sending)'),
+                        'half_open' => __('Testing Centraliza'),
+                        default => __('Open (Centraliza unavailable)'),
+                    }) ?>
+                </dd>
+            </div>
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('On the queue')) ?></dt>
+                <dd>
+                    <?php if ($queue === null): ?>
+                        <?= $escaper->escapeHtml(__('See RabbitMQ')) ?>
+                    <?php else: ?>
+                        <?= $escaper->escapeHtml(__('%1 real time · %2 bulk', $queue['realtime'] ?? 0, $queue['bulk'] ?? 0)) ?>
+                    <?php endif; ?>
+                </dd>
+            </div>
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('Waiting for a new attempt')) ?></dt>
+                <dd><?= (int)$block->getHeld() ?></dd>
+            </div>
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('Quarantine')) ?></dt>
+                <dd class="<?= $quarantined > 0 ? 'centraliza-bad' : 'centraliza-ok' ?>">
+                    <?= (int)$quarantined ?>
+                    <?php if ($quarantined > 0): ?>
+                        <form method="post" action="<?= $escaper->escapeUrl($block->getRetryQuarantineUrl()) ?>"
+                              data-mage-init='<?= $escaper->escapeHtmlAttr(json_encode(['Centraliza_Connector/js/confirm-form' => ['message' => (string)__('Send the %1 quarantined event(s) again?', $quarantined)]])) ?>'>
+                            <input type="hidden" name="form_key" value="<?= $escaper->escapeHtmlAttr($formKey) ?>"/>
+                            <button type="submit" class="action-secondary" style="margin-left: 1rem;"><span><?= $escaper->escapeHtml(__('Send again')) ?></span></button>
+                        </form>
+                    <?php endif; ?>
+                </dd>
+            </div>
+            <div class="centraliza-card">
+                <dt><?= $escaper->escapeHtml(__('Last 24 hours')) ?></dt>
+                <dd style="font-size: 1.3rem;">
+                    <?php if ($lastDay === []): ?>
+                        <?= $escaper->escapeHtml(__('No requests')) ?>
+                    <?php else: ?>
+                        <?php foreach ($lastDay as $outcome => $total): ?>
+                            <span class="<?= $outcome === 'accepted' ? 'centraliza-ok' : 'centraliza-bad' ?>"><?= $escaper->escapeHtml($outcome) ?>: <?= (int)$total ?></span><br/>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </dd>
+            </div>
+        </dl>
+    </section>
+
+    <section>
+        <h2><?= $escaper->escapeHtml(__('Send every record')) ?></h2>
+        <p><?= $escaper->escapeHtml(__('Each button puts every record of the entity covered by the website on the queue, as "<entity>.updated" events. The queue then sends them within the request limit, so a large entity takes a while: follow it in "On the queue" and in the sent requests.')) ?></p>
+        <table class="data-grid">
+            <thead>
+            <tr>
+                <th class="data-grid-th"><?= $escaper->escapeHtml(__('Entity')) ?></th>
+                <th class="data-grid-th"><?= $escaper->escapeHtml(__('Records')) ?></th>
+                <th class="data-grid-th"><?= $escaper->escapeHtml(__('Send in progress')) ?></th>
+                <th class="data-grid-th"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($block->getStreams() as $stream): ?>
+                <?php $active = $stream['active']; ?>
+                <tr>
+                    <td><?= $escaper->escapeHtml($stream['label']) ?> <small>(<?= $escaper->escapeHtml($stream['code']) ?>)</small></td>
+                    <td><?= $stream['count'] === null ? '—' : (int)$stream['count'] ?></td>
+                    <td>
+                        <?php if ($active === null): ?>
+                            —
+                        <?php else: ?>
+                            <?= $escaper->escapeHtml($block->statusLabel((string)$active['status'])) ?>:
+                            <?= (int)$active['published'] ?> / <?= (int)$active['total'] ?>
+                            <?php if ((string)$active['last_error'] !== ''): ?>
+                                <br/><span class="centraliza-bad"><?= $escaper->escapeHtml((string)$active['last_error']) ?></span>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($active === null): ?>
+                            <form method="post" action="<?= $escaper->escapeUrl($block->getStartUrl()) ?>"
+                                  data-mage-init='<?= $escaper->escapeHtmlAttr(json_encode(['Centraliza_Connector/js/confirm-form' => ['message' => (string)__('Send all %1 record(s) of %2 to Centraliza?', (int)$stream['count'], $stream['label'])]])) ?>'>
+                                <input type="hidden" name="form_key" value="<?= $escaper->escapeHtmlAttr($formKey) ?>"/>
+                                <input type="hidden" name="stream" value="<?= $escaper->escapeHtmlAttr($stream['code']) ?>"/>
+                                <button type="submit" class="action-primary" <?= $block->canSend() && $stream['count'] ? '' : 'disabled' ?>>
+                                    <span><?= $escaper->escapeHtml(__('Send %1', $stream['label'])) ?></span>
+                                </button>
+                            </form>
+                        <?php else: ?>
+                            <form method="post" action="<?= $escaper->escapeUrl($block->getCancelUrl()) ?>">
+                                <input type="hidden" name="form_key" value="<?= $escaper->escapeHtmlAttr($formKey) ?>"/>
+                                <input type="hidden" name="id" value="<?= (int)$active['backfill_id'] ?>"/>
+                                <button type="submit" class="action-secondary"><span><?= $escaper->escapeHtml(__('Cancel')) ?></span></button>
+                            </form>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h2><?= $escaper->escapeHtml(__('Recent sends')) ?></h2>
+        <?php $recent = $block->getRecentBackfills(); ?>
+        <?php if ($recent === []): ?>
+            <p><?= $escaper->escapeHtml(__('No entity was sent whole yet.')) ?></p>
+        <?php else: ?>
+            <table class="data-grid">
+                <thead>
+                <tr>
+                    <th class="data-grid-th">#</th>
+                    <th class="data-grid-th"><?= $escaper->escapeHtml(__('Entity')) ?></th>
+                    <th class="data-grid-th"><?= $escaper->escapeHtml(__('Status')) ?></th>
+                    <th class="data-grid-th"><?= $escaper->escapeHtml(__('On the queue')) ?></th>
+                    <th class="data-grid-th"><?= $escaper->escapeHtml(__('Asked by')) ?></th>
+                    <th class="data-grid-th"><?= $escaper->escapeHtml(__('Asked at')) ?></th>
+                    <th class="data-grid-th"><?= $escaper->escapeHtml(__('Finished at')) ?></th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($recent as $backfill): ?>
+                    <tr>
+                        <td><?= (int)$backfill['backfill_id'] ?></td>
+                        <td><?= $escaper->escapeHtml($block->streamLabel((string)$backfill['stream'])) ?></td>
+                        <td>
+                            <?= $escaper->escapeHtml($block->statusLabel((string)$backfill['status'])) ?>
+                            <?php if ((string)$backfill['last_error'] !== ''): ?>
+                                <br/><small class="centraliza-bad"><?= $escaper->escapeHtml((string)$backfill['last_error']) ?></small>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= (int)$backfill['published'] ?> / <?= (int)$backfill['total'] ?></td>
+                        <td><?= $escaper->escapeHtml((string)$backfill['requested_by']) ?></td>
+                        <td><?= $escaper->escapeHtml($block->displayTime((string)$backfill['created_at'])) ?></td>
+                        <td><?= $escaper->escapeHtml($block->displayTime($backfill['finished_at'] === null ? null : (string)$backfill['finished_at'])) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </section>
+</div>

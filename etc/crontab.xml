@@ -7,5 +7,11 @@
         <job name="centraliza_connector_report_health" instance="Centraliza\Connector\Cron\ReportHealth" method="execute">
             <schedule>* * * * *</schedule>
         </job>
+        <job name="centraliza_connector_run_backfills" instance="Centraliza\Connector\Cron\RunBackfills" method="execute">
+            <schedule>* * * * *</schedule>
+        </job>
+        <job name="centraliza_connector_clean_delivery_log" instance="Centraliza\Connector\Cron\CleanDeliveryLog" method="execute">
+            <schedule>40 3 * * *</schedule>
+        </job>
     </group>
 </config>

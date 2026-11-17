@@ -16,6 +16,7 @@ use Centraliza\Connector\Core\Model\OutcomeKind;
 use Centraliza\Connector\Core\Policy\ConnectionEventPolicy;
 use Centraliza\Connector\Core\Port\CircuitStoreInterface;
 use Centraliza\Connector\Core\Port\ClockInterface;
+use Centraliza\Connector\Core\Port\DeliveryLogInterface;
 use Centraliza\Connector\Core\Port\QuarantineStoreInterface;
 use Centraliza\Connector\Core\Port\RecordReaderInterface;
 use Centraliza\Connector\Core\Port\RetryStoreInterface;
@@ -49,6 +50,9 @@ class DeliverEventTest extends TestCase
 
     /** @var array<int, array{0: string, 1: array<string, mixed>}> */
     private array $told = [];
+
+    /** @var list<array{0: string, 1: string}> outcome and action of each logged request */
+    private array $logged = [];
 
     public function testAnAcceptedEventLeavesNothingBehind(): void
     {
@@ -256,7 +260,42 @@ class DeliverEventTest extends TestCase
             $quarantine,
             $clock,
             $this->reader(),
-            $this->telemetry()
+            $this->telemetry(),
+            $this->log()
         );
+    }
+
+    private function log(): DeliveryLogInterface
+    {
+        $log = $this->createMock(DeliveryLogInterface::class);
+        $log->method('record')->willReturnCallback(function (HeldEvent $held, Outcome $outcome, Action $action): void {
+            $this->logged[] = [$outcome->kind->value, $action->value];
+        });
+
+        return $log;
+    }
+
+    public function testEachRequestIsLoggedWithWhatWasDoneAfterwards(): void
+    {
+        $this->service(Outcome::of(OutcomeKind::Rejected, 'sku is required'))->deliver($this->event(0), 0.0);
+
+        self::assertSame([['rejected', 'quarantine']], $this->logged);
+    }
+
+    public function testAnEventHeldWithoutARequestIsNotLogged(): void
+    {
+        $this->service(Outcome::held(OutcomeKind::RateLimited, 30, 'Shared request quota used up or paused.'))
+            ->deliver($this->event(0), 0.0);
+
+        self::assertSame([], $this->logged);
+    }
+
+    public function testAGoneRecordIsNotLogged(): void
+    {
+        $this->record = null;
+
+        $this->service(Outcome::of(OutcomeKind::Accepted))->deliver($this->event(0), 0.0);
+
+        self::assertSame([], $this->logged);
     }
 }

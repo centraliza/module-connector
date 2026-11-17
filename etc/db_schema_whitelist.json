@@ -176,5 +176,56 @@
             "CENTRALIZA_NOTIFICATION_EXTERNAL_ID": true,
             "CENTRALIZA_NOTIFICATION_ORDER_ID_SALES_ORDER_ENTITY_ID": true
         }
+    },
+    "centraliza_connector_delivery_log": {
+        "column": {
+            "log_id": true,
+            "created_at": true,
+            "website_id": true,
+            "stream": true,
+            "verb": true,
+            "record_key": true,
+            "idempotency_key": true,
+            "lane": true,
+            "attempt": true,
+            "outcome": true,
+            "action": true,
+            "http_status": true,
+            "detail": true,
+            "mode": true,
+            "environment": true,
+            "send_ms": true,
+            "lag_seconds": true
+        },
+        "index": {
+            "CENTRALIZA_CONNECTOR_DELIVERY_LOG_CREATED_AT": true,
+            "CENTRALIZA_CONNECTOR_DELIVERY_LOG_STREAM_CREATED_AT": true,
+            "CENTRALIZA_CONNECTOR_DELIVERY_LOG_OUTCOME_CREATED_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "centraliza_connector_backfill": {
+        "column": {
+            "backfill_id": true,
+            "stream": true,
+            "website_id": true,
+            "status": true,
+            "last_key": true,
+            "total": true,
+            "published": true,
+            "requested_by": true,
+            "last_error": true,
+            "created_at": true,
+            "updated_at": true,
+            "finished_at": true
+        },
+        "index": {
+            "CENTRALIZA_CONNECTOR_BACKFILL_STATUS": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
     }
 }

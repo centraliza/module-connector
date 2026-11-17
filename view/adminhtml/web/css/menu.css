@@ -1,0 +1,4 @@
+/* Icon of the Centraliza Connector menu, from the admin icon font (the "refresh" arrows). */
+.admin__menu .item-centraliza-connector > a:before {
+    content: '\e61f';
+}

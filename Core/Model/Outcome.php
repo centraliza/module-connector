@@ -12,7 +12,11 @@ final readonly class Outcome
     public function __construct(
         public OutcomeKind $kind,
         public ?int $retryAfterSeconds = null,
-        public string $detail = ''
+        public string $detail = '',
+        /** The HTTP status Centraliza answered with; null when there was no answer. */
+        public ?int $httpStatus = null,
+        /** False when the transport kept the event without making a request (no key, no quota left). */
+        public bool $requested = true
     ) {
     }
 
@@ -29,5 +33,13 @@ final readonly class Outcome
     public static function unavailable(?int $retryAfterSeconds = null, string $detail = ''): self
     {
         return new self(OutcomeKind::Unavailable, $retryAfterSeconds, $detail);
+    }
+
+    /**
+     * Nothing was sent: the transport kept the event back on its own.
+     */
+    public static function held(OutcomeKind $kind, ?int $retryAfterSeconds = null, string $detail = ''): self
+    {
+        return new self($kind, $retryAfterSeconds, $detail, null, false);
     }
 }

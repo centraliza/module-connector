@@ -1,0 +1,148 @@
+<?xml version="1.0"?>
+<listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">centraliza_connector_delivery_listing.centraliza_connector_delivery_listing_data_source</item>
+        </item>
+    </argument>
+    <settings>
+        <buttons>
+            <button name="dashboard">
+                <url path="*/dashboard/index"/>
+                <class>back</class>
+                <label translate="true">Dashboard</label>
+            </button>
+        </buttons>
+        <spinner>centraliza_connector_delivery_columns</spinner>
+        <deps>
+            <dep>centraliza_connector_delivery_listing.centraliza_connector_delivery_listing_data_source</dep>
+        </deps>
+    </settings>
+    <dataSource name="centraliza_connector_delivery_listing_data_source" component="Magento_Ui/js/grid/provider">
+        <settings>
+            <storageConfig>
+                <param name="indexField" xsi:type="string">log_id</param>
+            </storageConfig>
+            <updateUrl path="mui/index/render"/>
+        </settings>
+        <aclResource>Centraliza_Connector::deliveries</aclResource>
+        <dataProvider class="Magento\Framework\View\Element\UiComponent\DataProvider\DataProvider" name="centraliza_connector_delivery_listing_data_source">
+            <settings>
+                <requestFieldName>id</requestFieldName>
+                <primaryFieldName>log_id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+    <listingToolbar name="listing_top">
+        <settings>
+            <sticky>true</sticky>
+        </settings>
+        <bookmark name="bookmarks"/>
+        <columnsControls name="columns_controls"/>
+        <filters name="listing_filters"/>
+        <!-- No export: record keys of customers carry their e-mail. -->
+        <paging name="listing_paging"/>
+    </listingToolbar>
+    <columns name="centraliza_connector_delivery_columns">
+        <column name="log_id" sortOrder="10">
+            <settings>
+                <filter>textRange</filter>
+                <sorting>desc</sorting>
+                <label translate="true">ID</label>
+            </settings>
+        </column>
+        <column name="created_at" class="Magento\Ui\Component\Listing\Columns\Date" component="Magento_Ui/js/grid/columns/date" sortOrder="20">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Sent At</label>
+            </settings>
+        </column>
+        <column name="stream" component="Magento_Ui/js/grid/columns/select" sortOrder="30">
+            <settings>
+                <options class="Centraliza\Connector\Model\Config\Source\Stream"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Entity</label>
+            </settings>
+        </column>
+        <column name="verb" sortOrder="40">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Event</label>
+            </settings>
+        </column>
+        <column name="record_key" sortOrder="50">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Record</label>
+            </settings>
+        </column>
+        <column name="outcome" component="Magento_Ui/js/grid/columns/select" sortOrder="60">
+            <settings>
+                <options class="Centraliza\Connector\Model\Config\Source\Outcome"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Answer</label>
+            </settings>
+        </column>
+        <column name="http_status" sortOrder="70">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">HTTP</label>
+            </settings>
+        </column>
+        <column name="action" component="Magento_Ui/js/grid/columns/select" sortOrder="80">
+            <settings>
+                <options class="Centraliza\Connector\Model\Config\Source\DeliveryAction"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Afterwards</label>
+            </settings>
+        </column>
+        <column name="attempt" sortOrder="90">
+            <settings>
+                <label translate="true">Attempt</label>
+            </settings>
+        </column>
+        <column name="detail" sortOrder="100">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Detail</label>
+            </settings>
+        </column>
+        <column name="mode" component="Magento_Ui/js/grid/columns/select" sortOrder="110">
+            <settings>
+                <options class="Centraliza\Connector\Model\Config\Source\Mode"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Mode</label>
+            </settings>
+        </column>
+        <column name="environment" component="Magento_Ui/js/grid/columns/select" sortOrder="120">
+            <settings>
+                <options class="Centraliza\Connector\Model\Config\Source\Environment"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Environment</label>
+            </settings>
+        </column>
+        <column name="send_ms" sortOrder="130">
+            <settings>
+                <label translate="true">Duration (ms)</label>
+            </settings>
+        </column>
+        <column name="lag_seconds" sortOrder="140">
+            <settings>
+                <label translate="true">Delay Since the Change (s)</label>
+            </settings>
+        </column>
+        <column name="idempotency_key" sortOrder="150">
+            <settings>
+                <filter>text</filter>
+                <visible>false</visible>
+                <label translate="true">Idempotency Key</label>
+            </settings>
+        </column>
+    </columns>
+</listing>

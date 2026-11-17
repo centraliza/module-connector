@@ -13,6 +13,7 @@ use Centraliza\Connector\Core\Model\Outcome;
 use Centraliza\Connector\Core\Model\OutcomeKind;
 use Centraliza\Connector\Core\Policy\DeliveryPolicyInterface;
 use Centraliza\Connector\Core\Port\ClockInterface;
+use Centraliza\Connector\Core\Port\DeliveryLogInterface;
 use Centraliza\Connector\Core\Port\QuarantineStoreInterface;
 use Centraliza\Connector\Core\Port\RecordReaderInterface;
 use Centraliza\Connector\Core\Port\RetryStoreInterface;
@@ -38,7 +39,8 @@ final readonly class DeliverEvent
         private QuarantineStoreInterface $quarantine,
         private ClockInterface $clock,
         private RecordReaderInterface $reader,
-        private TelemetryInterface $telemetry
+        private TelemetryInterface $telemetry,
+        private DeliveryLogInterface $log
     ) {
     }
 
@@ -81,8 +83,12 @@ final readonly class DeliverEvent
         $outcome = $this->transport->send($event);
         $sendMs = $this->msSince($startedAt);
         $this->gate->report(self::CIRCUIT_SCOPE, $outcome);
+        $action = $this->settle($held, $outcome, $jitter);
+        if ($outcome->requested) {
+            $this->log->record($held, $outcome, $action, $sendMs);
+        }
 
-        return $this->tell($held, $this->settle($held, $outcome, $jitter), $outcome->kind->value, $outcome->detail, $readMs, $sendMs);
+        return $this->tell($held, $action, $outcome->kind->value, $outcome->detail, $readMs, $sendMs);
     }
 
     /**

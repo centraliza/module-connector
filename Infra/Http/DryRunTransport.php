@@ -49,9 +49,9 @@ class DryRunTransport implements TransportInterface
 
             $this->filesystem->getDirectoryWrite(DirectoryList::VAR_DIR)->writeFile(self::LOG_FILE, $line . "\n", 'a');
         } catch (Throwable $e) {
-            return Outcome::unavailable(null, 'Dry run log could not be written.');
+            return Outcome::held(OutcomeKind::Unavailable, null, 'Dry run log could not be written.');
         }
 
-        return Outcome::of(OutcomeKind::Accepted);
+        return Outcome::of(OutcomeKind::Accepted, 'Simulated: written to ' . self::LOG_FILE);
     }
 }

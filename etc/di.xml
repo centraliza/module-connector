@@ -20,6 +20,40 @@
     <preference for="Centraliza\Connector\Core\Port\TransactionStateInterface" type="Centraliza\Connector\Infra\Db\TransactionState"/>
     <preference for="Centraliza\Connector\Core\Port\SettingsInterface" type="Centraliza\Connector\Infra\Config\Settings"/>
     <preference for="Centraliza\Connector\Core\Port\IdGeneratorInterface" type="Centraliza\Connector\Infra\Id\UuidGenerator"/>
+    <preference for="Centraliza\Connector\Core\Port\DeliveryLogInterface" type="Centraliza\Connector\Infra\Persistence\DeliveryLog"/>
+
+    <!-- Whole-stream sends asked from the admin dashboard, in the order the dashboard lists them. -->
+    <type name="Centraliza\Connector\Backfill\BackfillService">
+        <arguments>
+            <!-- Straight to the queue: a failed publish stops the page, which the next run puts on the queue again. -->
+            <argument name="publisher" xsi:type="object">Centraliza\Connector\Infra\Queue\QueuePublisher</argument>
+            <argument name="sources" xsi:type="array">
+                <item name="products" xsi:type="object">Centraliza\Connector\Backfill\Source\ProductSource</item>
+                <item name="prices" xsi:type="object">Centraliza\Connector\Backfill\Source\ProductSource</item>
+                <item name="stock" xsi:type="object">Centraliza\Connector\Backfill\Source\StockSource</item>
+                <item name="locations" xsi:type="object">Centraliza\Connector\Backfill\Source\LocationSource</item>
+                <item name="customers" xsi:type="object">Centraliza\Connector\Backfill\Source\CustomerSource</item>
+                <item name="customer_groups" xsi:type="object">Centraliza\Connector\Backfill\Source\CustomerGroupSource</item>
+                <item name="orders" xsi:type="object">Centraliza\Connector\Backfill\Source\OrderSource</item>
+                <item name="carts" xsi:type="object">Centraliza\Connector\Backfill\Source\CartSource</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!-- "Sent requests" grid. -->
+    <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
+        <arguments>
+            <argument name="collections" xsi:type="array">
+                <item name="centraliza_connector_delivery_listing_data_source" xsi:type="string">CentralizaConnectorDeliveryLogGridCollection</item>
+            </argument>
+        </arguments>
+    </type>
+    <virtualType name="CentralizaConnectorDeliveryLogGridCollection" type="Magento\Framework\View\Element\UiComponent\DataProvider\SearchResult">
+        <arguments>
+            <argument name="mainTable" xsi:type="string">centraliza_connector_delivery_log</argument>
+            <argument name="resourceModel" xsi:type="string">Centraliza\Connector\Infra\Persistence\ResourceModel\DeliveryLog</argument>
+        </arguments>
+    </virtualType>
 
     <!-- The collector is built on the first commit of every request; the queue stack behind it only when there is something to publish. -->
     <type name="Centraliza\Connector\Capture\Collector">

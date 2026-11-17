@@ -487,6 +487,21 @@ O comando importa um website: o que tem a integração antiga ligada com chave, 
 
 O comando nunca desliga um website no conector e não mexe no `mode` nem no `environment`. Rodar de novo não desfaz nada. Ele para se a integração antiga estiver ligada em mais de um website sem `--website`, ou se outro website já reportar no conector. A chave nunca é impressa, só um fingerprint `sha256:` de 8 caracteres.
 
+## Telas do admin
+
+Menu **Centraliza Connector** (ACL `Centraliza_Connector::centraliza_connector`, separada da configuração, para que dar acesso às telas não dê acesso à chave):
+
+| Tela | Rota | ACL | O que mostra |
+|---|---|---|---|
+| Painel | `centraliza_connector/dashboard/index` | `::manage` | website que reporta, ambiente, modo, chave verificada, channel ID, limite, circuit breaker, fila por lane, retry, quarentena (com botão "Enviar de novo") e resultados das últimas 24 h; um botão por entidade para enviar todos os registros; os envios recentes |
+| Requisições enviadas | `centraliza_connector/delivery/index` | `::deliveries` | grade de `centraliza_connector_delivery_log`: quando, entidade, verbo, chave do registro, resposta, HTTP, o que foi feito depois, tentativa, detalhe, modo, ambiente, duração e atraso desde a mudança |
+
+**Registro de envios.** `DeliverEvent` grava uma linha por requisição feita (ou simulada, em `dry_run`) pela porta `Core\Port\DeliveryLogInterface`. Evento retido sem requisição (sem chave, sem cota: `Outcome::held()`) e registro que sumiu não geram linha. Guarda a chave do registro, não o registro, que é lido de novo a cada tentativa e pode ter dado pessoal. A grade não exporta CSV (a chave de cliente leva o e-mail). O cron `centraliza_connector_clean_delivery_log` (03:40) apaga o que passou de 30 dias.
+
+**Enviar todos os registros de uma entidade** (`Backfill\BackfillService`). O botão grava um pedido em `centraliza_connector_backfill`, e as páginas de chaves (500 por vez) vão para a fila como `<stream>.updated` até a entidade acabar. O controller já põe até 2.000 na hora, então entidade pequena termina antes de a página recarregar. O cron `centraliza_connector_run_backfills` continua a cada minuto, com até 10 mil por execução e 40 s de orçamento, sob lock. Tudo vai na lane `bulk`, qualquer que seja a entidade, para um envio de todos os pedidos não atrasar os pedidos de agora. Quem dita o ritmo das requisições é a fila com a cota compartilhada. Há um envio ativo por entidade; cancelar para de pôr na fila, e o que já está lá ainda sai.
+
+O que cada entidade envia segue as regras da captura: produtos, preços e estoque dos produtos do website; clientes do website; pedidos e carrinhos das store views do website (carrinho só aberto, e de visitante só com `carts/guests`); grupos e origens todos. Uma chave inválida (SKU vazio) é pulada, e o resto da página segue. Se o website que reporta mudar no meio, o envio falha com o motivo.
+
 ## Observabilidade (New Relic)
 
 O módulo registra três eventos customizados pela porta `Core\Port\TelemetryInterface`. O adaptador `Infra\Telemetry\NewRelicTelemetry` usa `newrelic_record_custom_event`; sem a extensão do agente carregada, nada acontece. Nenhum evento leva o `record`, que pode conter dado pessoal.

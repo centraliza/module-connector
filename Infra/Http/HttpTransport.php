@@ -40,18 +40,18 @@ class HttpTransport implements TransportInterface
         $baseUrl = $this->settings->baseUrl();
         if ($apiKey === '' || $connectionId === '' || $baseUrl === '') {
             // Held like a refused key: nothing is sent and no attempt is spent until it is configured.
-            return Outcome::of(OutcomeKind::Unauthorized, 'The API key or the connection id is not configured.');
+            return Outcome::held(OutcomeKind::Unauthorized, null, 'The API key or the connection id is not configured.');
         }
 
         try {
             $wait = $this->quota->take($apiKey);
         } catch (Throwable $e) {
             // Sending unreserved would let every consumer exceed the limit at once.
-            return Outcome::unavailable(null, 'The shared request quota could not be checked: ' . $e::class);
+            return Outcome::held(OutcomeKind::Unavailable, null, 'The shared request quota could not be checked: ' . $e::class);
         }
         if ($wait > 0) {
             // Used up for now, or the key is paused: no attempt is spent.
-            return new Outcome(OutcomeKind::RateLimited, $wait, 'Shared request quota used up or paused.');
+            return Outcome::held(OutcomeKind::RateLimited, $wait, 'Shared request quota used up or paused.');
         }
 
         try {
@@ -82,12 +82,12 @@ class HttpTransport implements TransportInterface
         $detail = 'HTTP ' . $status;
 
         return match (true) {
-            $status >= 200 && $status < 300 => Outcome::of(OutcomeKind::Accepted),
-            $status === 400 || $status === 422 => Outcome::of(OutcomeKind::Rejected, $detail . $this->message($response)),
-            $status === 429 => Outcome::rateLimited($this->retryAfter($response)),
-            $status === 401 => Outcome::of(OutcomeKind::Unauthorized, $detail),
-            $status === 403 || $status === 404 => Outcome::of(OutcomeKind::RouteRefused, $detail . $this->message($response)),
-            default => Outcome::unavailable($this->retryAfter($response), $detail),
+            $status >= 200 && $status < 300 => new Outcome(OutcomeKind::Accepted, null, $detail, $status),
+            $status === 400 || $status === 422 => new Outcome(OutcomeKind::Rejected, null, $detail . $this->message($response), $status),
+            $status === 429 => new Outcome(OutcomeKind::RateLimited, $this->retryAfter($response), $detail, $status),
+            $status === 401 => new Outcome(OutcomeKind::Unauthorized, null, $detail, $status),
+            $status === 403 || $status === 404 => new Outcome(OutcomeKind::RouteRefused, null, $detail . $this->message($response), $status),
+            default => new Outcome(OutcomeKind::Unavailable, $this->retryAfter($response), $detail, $status),
         };
     }
 

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <!-- The id after "::" names the CSS class of the item (item-centraliza-connector), which gives it its icon. -->
+        <add id="Centraliza_Connector::centraliza_connector" title="Centraliza Connector" translate="title"
+             module="Centraliza_Connector" sortOrder="81" resource="Centraliza_Connector::centraliza_connector"/>
+        <add id="Centraliza_Connector::dashboard" title="Dashboard" translate="title" module="Centraliza_Connector"
+             sortOrder="10" parent="Centraliza_Connector::centraliza_connector"
+             action="centraliza_connector/dashboard/index" resource="Centraliza_Connector::manage"/>
+        <add id="Centraliza_Connector::deliveries" title="Sent Requests" translate="title" module="Centraliza_Connector"
+             sortOrder="20" parent="Centraliza_Connector::centraliza_connector"
+             action="centraliza_connector/delivery/index" resource="Centraliza_Connector::deliveries"/>
+        <add id="Centraliza_Connector::configuration" title="Configuration" translate="title" module="Centraliza_Connector"
+             sortOrder="30" parent="Centraliza_Connector::centraliza_connector"
+             action="adminhtml/system_config/edit/section/centraliza_connector" resource="Centraliza_Connector::config"/>
+    </menu>
+</config>
