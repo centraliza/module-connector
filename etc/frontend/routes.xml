@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:App/etc/routes.xsd">
+    <router id="standard">
+        <!--
+            The storefront route of the cart recovery link, /centraliza/cart_redirect/?cart_id=<masked id>, already sent
+            in WhatsApp messages. Centraliza_Sales declares the same route while it is installed; the module listed
+            first that has the controller answers, so this module comes after it (here and in module.xml) and the
+            legacy controller keeps answering while the legacy module is enabled.
+        -->
+        <route id="centraliza" frontName="centraliza">
+            <module name="Centraliza_Connector" after="Centraliza_Sales"/>
+        </route>
+    </router>
+</config>

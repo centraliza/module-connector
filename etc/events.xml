@@ -82,4 +82,18 @@
     <event name="sales_quote_address_save_after">
         <observer name="centraliza_connector_record_cart_part" instance="Centraliza\Connector\Entity\Cart\Observer\RecordCartPart"/>
     </event>
+    <!-- Order notifications. _commit_after, not _save_after: the first fires once the transaction has committed,
+         the second inside it, and would notify a change that can still be rolled back. The observer name is apart
+         from the legacy one, which the same name would replace while Centraliza_Sales is installed. -->
+    <!-- Cart recovery link, ported from Centraliza_Sales: the link's mark follows a merged cart and reaches the order.
+         Both do nothing while Centraliza_Sales is enabled. -->
+    <event name="sales_model_service_quote_submit_before">
+        <observer name="centraliza_connector_copy_cart_origin_to_order" instance="Centraliza\Connector\Messaging\Observer\CopyCartOriginToOrder"/>
+    </event>
+    <event name="sales_quote_merge_after">
+        <observer name="centraliza_connector_carry_cart_link_on_merge" instance="Centraliza\Connector\Messaging\Observer\CarryCartLinkOnMerge"/>
+    </event>
+    <event name="sales_order_save_commit_after">
+        <observer name="centraliza_connector_order_notification" instance="Centraliza\Connector\Messaging\Observer\PublishOrderStatusChange"/>
+    </event>
 </config>

@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_WebapiAsync:etc/webapi_async.xsd">
+    <!-- As in Centraliza_Sales: the callback answers with the real outcome (404 for an unknown id) and changes the
+         row before Centraliza gets its reply, so the async and async/bulk URLs are rewritten to a path no route
+         serves. The integration-only check in markSent is the control that holds whatever the path is. -->
+    <service class="Centraliza\Connector\Messaging\Api\NotificationDeliveryManagementInterface" method="markSent">
+        <synchronousInvocationOnly>true</synchronousInvocationOnly>
+    </service>
+    <route url="async/V1/centraliza/notification/sent/synchronous-only" method="POST"
+           alias="async/V1/centraliza/notification/sent"/>
+    <route url="async/bulk/V1/centraliza/notification/sent/synchronous-only" method="POST"
+           alias="async/bulk/V1/centraliza/notification/sent"/>
+</services>

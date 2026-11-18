@@ -13,5 +13,20 @@
         <job name="centraliza_connector_clean_delivery_log" instance="Centraliza\Connector\Cron\CleanDeliveryLog" method="execute">
             <schedule>40 3 * * *</schedule>
         </job>
+        <!-- Abandoned carts, ported from Centraliza_Sales. Every minute, so Cart Abandonment Time is kept to the minute
+             (ProcessAbandonedCarts::RUN_INTERVAL_MINUTES). -->
+        <job name="centraliza_connector_abandoned_cart" instance="Centraliza\Connector\Messaging\Cron\AbandonedCart\ProcessAbandonedCarts" method="execute">
+            <schedule>* * * * *</schedule>
+        </job>
+    </group>
+    <!-- Job names apart from the legacy ones: the same name would replace the legacy job while it is installed. -->
+    <group id="centraliza_notification">
+        <!-- Every minute: the spacing between resends is next_attempt_at, not this schedule. -->
+        <job name="centraliza_connector_notification_send" instance="Centraliza\Connector\Messaging\Cron\OrderNotification\SendNotifications" method="execute">
+            <schedule>* * * * *</schedule>
+        </job>
+        <job name="centraliza_connector_notification_clean" instance="Centraliza\Connector\Messaging\Cron\OrderNotification\CleanNotifications" method="execute">
+            <schedule>15 3 * * *</schedule>
+        </job>
     </group>
 </config>

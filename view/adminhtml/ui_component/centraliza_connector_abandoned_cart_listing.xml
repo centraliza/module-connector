@@ -1,0 +1,165 @@
+<?xml version="1.0"?>
+<listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">centraliza_connector_abandoned_cart_listing.centraliza_connector_abandoned_cart_listing_data_source</item>
+        </item>
+    </argument>
+    <settings>
+        <buttons>
+            <button name="send_now" class="CentralizaConnectorAbandonedCartSendNowButton"/>
+        </buttons>
+        <spinner>centraliza_connector_abandoned_cart_columns</spinner>
+        <deps>
+            <dep>centraliza_connector_abandoned_cart_listing.centraliza_connector_abandoned_cart_listing_data_source</dep>
+        </deps>
+    </settings>
+    <dataSource name="centraliza_connector_abandoned_cart_listing_data_source" component="Magento_Ui/js/grid/provider">
+        <settings>
+            <storageConfig>
+                <param name="indexField" xsi:type="string">entity_id</param>
+            </storageConfig>
+            <updateUrl path="mui/index/render"/>
+        </settings>
+        <!-- mui/index/render only requires Magento_Backend::admin: without this resource any
+             admin user could read the grid rows through the data source. -->
+        <aclResource>Centraliza_Sales::abandoned_cart</aclResource>
+        <dataProvider class="Magento\Framework\View\Element\UiComponent\DataProvider\DataProvider"
+                      name="centraliza_connector_abandoned_cart_listing_data_source">
+            <settings>
+                <requestFieldName>id</requestFieldName>
+                <primaryFieldName>entity_id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+    <listingToolbar name="listing_top">
+        <settings>
+            <sticky>true</sticky>
+        </settings>
+        <bookmark name="bookmarks"/>
+        <columnsControls name="columns_controls"/>
+        <filters name="listing_filters"/>
+        <!-- Read-only grid: no mass action, since manual resend is out of scope. No export button
+             either, because last_error holds third-party text a spreadsheet may read as a formula.
+             Leaving the button out only hides it: mui/export/gridToCsv still answers by URL, and
+             the dataSource aclResource is what gates it. -->
+        <paging name="listing_paging"/>
+    </listingToolbar>
+    <columns name="centraliza_connector_abandoned_cart_columns">
+        <column name="entity_id" sortOrder="10">
+            <settings>
+                <sorting>desc</sorting>
+                <filter>textRange</filter>
+                <dataType>number</dataType>
+                <label translate="true">ID</label>
+            </settings>
+        </column>
+        <column name="quote_id" sortOrder="20">
+            <settings>
+                <filter>textRange</filter>
+                <dataType>number</dataType>
+                <label translate="true">Cart ID</label>
+            </settings>
+        </column>
+        <column name="reminder_number" class="Centraliza\Connector\Messaging\Ui\Component\Listing\Column\NotificationNumber"
+                sortOrder="30">
+            <settings>
+                <dataType>number</dataType>
+                <label translate="true">Notification</label>
+            </settings>
+        </column>
+        <column name="website_id" component="Magento_Ui/js/grid/columns/select" sortOrder="40">
+            <settings>
+                <options class="Magento\Store\Model\ResourceModel\Website\Collection"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Website</label>
+            </settings>
+        </column>
+        <column name="status" component="Magento_Ui/js/grid/columns/select" sortOrder="50">
+            <settings>
+                <options class="Centraliza\Connector\Messaging\Ui\Component\Listing\Column\AbandonedCartStatus\Options"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Status</label>
+            </settings>
+        </column>
+        <!-- The cart version the message carried, next to the customer's last activity behind it: the
+             two together show the wait that was applied before the row was queued. -->
+        <column name="quote_updated_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date" sortOrder="60">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Cart Changed At</label>
+            </settings>
+        </column>
+        <!-- Empty on rows queued before this column existed. -->
+        <column name="last_activity_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date" sortOrder="70">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Customer Idle Since</label>
+            </settings>
+        </column>
+        <column name="created_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date" sortOrder="80">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Queued At</label>
+            </settings>
+        </column>
+        <column name="sent_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date" sortOrder="90">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Message Sent At</label>
+            </settings>
+        </column>
+        <column name="attempts" sortOrder="100">
+            <settings>
+                <filter>textRange</filter>
+                <dataType>number</dataType>
+                <label translate="true">Send Attempts</label>
+            </settings>
+        </column>
+        <column name="last_attempt_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date" sortOrder="110">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Last Attempt At</label>
+            </settings>
+        </column>
+        <column name="next_attempt_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date" sortOrder="120">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Next Attempt At</label>
+            </settings>
+        </column>
+        <!-- Filtered by the statuses the Base client handles, but shown as the raw number: a select
+             column would render a blank cell for any status outside that list. -->
+        <column name="last_http_status" sortOrder="130">
+            <settings>
+                <options class="Centraliza\Connector\Messaging\Model\Api\Source\HttpStatus"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Centraliza Response</label>
+            </settings>
+        </column>
+        <!-- Rendered by the default text cell, whose text binding escapes the value: the message
+             comes from Centraliza or a network intermediary and is never trusted as markup. -->
+        <column name="last_error" sortOrder="140">
+            <settings>
+                <label translate="true">Failure Reason</label>
+                <sortable>false</sortable>
+            </settings>
+        </column>
+    </columns>
+</listing>

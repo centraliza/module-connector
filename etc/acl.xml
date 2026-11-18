@@ -2,17 +2,38 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
     <acl>
         <resources>
+            <!--
+                The ids of the legacy Centraliza modules are kept, at the same place of the tree: roles and the
+                Integration granted them before keep their access. The place matters while the legacy modules are
+                still enabled: the same id under another parent is added twice to the ACL, and the admin fails to load.
+            -->
             <resource id="Magento_Backend::admin">
                 <!-- Outside Stores > Configuration on purpose: saving a role also grants every ancestor of a checked
                      resource, so a screen under the configuration node would hand its users the API key too. -->
-                <resource id="Centraliza_Connector::centraliza_connector" title="Centraliza" translate="title" sortOrder="81">
+                <resource id="Centraliza_Base::menu" title="Centraliza" translate="title" sortOrder="80">
                     <resource id="Centraliza_Connector::manage" title="Dashboard and sends" translate="title" sortOrder="10"/>
-                    <resource id="Centraliza_Connector::deliveries" title="Sent requests" translate="title" sortOrder="20"/>
+                    <resource id="Centraliza_Connector::deliveries" title="Sent requests" translate="title" sortOrder="15"/>
+                    <resource id="Centraliza_Notification::notification_log" title="Notifications" translate="title" sortOrder="20">
+                        <!-- Apart from the grid: each resend messages the customer again. -->
+                        <resource id="Centraliza_Notification::notification_resend" title="Resend" translate="title" sortOrder="10"/>
+                        <!-- Apart from the grid: the round messages every customer waiting in the queue. -->
+                        <resource id="Centraliza_Notification::notification_send_now" title="Send now" translate="title" sortOrder="20"/>
+                    </resource>
+                    <resource id="Centraliza_Sales::abandoned_cart" title="Abandoned Carts" translate="title" sortOrder="30">
+                        <!-- Apart from the grid: the round messages every customer with an abandoned cart. -->
+                        <resource id="Centraliza_Sales::abandoned_cart_send_now" title="Send now" translate="title" sortOrder="10"/>
+                    </resource>
                 </resource>
                 <resource id="Magento_Backend::stores">
                     <resource id="Magento_Backend::stores_settings">
                         <resource id="Magento_Config::config">
                             <resource id="Centraliza_Connector::config" title="Centraliza Connector" translate="title" sortOrder="81"/>
+                            <!-- Only the parent of the delivery callback once the legacy modules are gone. -->
+                            <resource id="Centraliza_Base::centraliza" title="Centraliza" translate="title" sortOrder="80">
+                                <!-- Granted to the Integration whose token Centraliza sends; the endpoint also refuses
+                                     admin callers, since older roles inherit this resource. -->
+                                <resource id="Centraliza_Notification::delivery_callback" title="Centraliza delivery callback" translate="title" sortOrder="10"/>
+                            </resource>
                         </resource>
                     </resource>
                 </resource>

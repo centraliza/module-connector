@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <virtualType name="CentralizaConnectorNotificationSendNowButton" type="Centraliza\Connector\Messaging\Ui\Component\Control\SendNowButton">
+        <arguments>
+            <argument name="actionPath" xsi:type="string">centraliza_connector/ordernotification/sendNow</argument>
+            <argument name="aclResource" xsi:type="string">Centraliza_Notification::notification_send_now</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="CentralizaConnectorAbandonedCartSendNowButton" type="Centraliza\Connector\Messaging\Ui\Component\Control\SendNowButton">
+        <arguments>
+            <argument name="actionPath" xsi:type="string">centraliza_connector/abandonedcart/sendNow</argument>
+            <argument name="aclResource" xsi:type="string">Centraliza_Sales::abandoned_cart_send_now</argument>
+        </arguments>
+    </virtualType>
+    <!-- Plugin names apart from the legacy one: the same name on the same type would replace it. -->
+    <type name="Magento\Ui\Controller\Adminhtml\Export\GridToCsv">
+        <plugin name="centraliza_connector_refuse_notification_export"
+                type="Centraliza\Connector\Messaging\Plugin\Ui\Export\RefuseOrderNotificationExport"/>
+    </type>
+    <type name="Magento\Ui\Controller\Adminhtml\Export\GridToXml">
+        <plugin name="centraliza_connector_refuse_notification_export"
+                type="Centraliza\Connector\Messaging\Plugin\Ui\Export\RefuseOrderNotificationExport"/>
+    </type>
+</config>

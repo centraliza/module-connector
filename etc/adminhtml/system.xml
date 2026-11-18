@@ -98,6 +98,88 @@
                     </depends>
                 </field>
             </group>
+            <!-- Ported from Centraliza_Sales (centraliza/order_notification/*). Nothing is sent while Centraliza_Sales
+                 is enabled: the legacy module keeps sending the messages then. -->
+            <group id="order_notification" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
+                <label>Order Notifications</label>
+                <comment>WhatsApp messages about the order status, sent by Centraliza (order.status_updated). They use the connection above, of the website that reports.</comment>
+                <field id="enabled" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Enabled</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="order_created_enabled" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Send Order Created and Origin Cart</label>
+                    <comment>For orders placed from a cart a Centraliza link opened: sends the order.created event and adds the cart to their status events. Keep it off until Centraliza confirms it accepts both.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="notified_statuses" translate="label comment" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Notified statuses</label>
+                    <frontend_model>Centraliza\Connector\Messaging\Block\Adminhtml\System\Config\Form\Field\NotifiedStatuses</frontend_model>
+                    <backend_model>Centraliza\Connector\Messaging\Model\Config\Backend\OrderNotification\NotifiedStatuses</backend_model>
+                    <comment>Order statuses that notify the customer. A status missing from this table produces no notification.</comment>
+                </field>
+                <field id="retry_enabled" translate="label" type="select" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Automatic resend</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="give_up_hours" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Give up after (hours)</label>
+                    <validate>required-entry validate-digits validate-greater-than-zero</validate>
+                    <comment>A notification still waiting to be sent (postponed or in the backlog) this many hours after it was created is marked failed. Resends themselves are capped by the attempt limit.</comment>
+                </field>
+                <field id="max_attempts" translate="label comment" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Maximum send attempts</label>
+                    <comment>Counts every send of a notification, including the first. When the last one fails, the notification is marked failed. Allowed: 1 to 10.</comment>
+                    <validate>required-entry validate-digits validate-digits-range digits-range-1-10</validate>
+                    <backend_model>Centraliza\Connector\Messaging\Model\Config\Backend\OrderNotification\MaxAttempts</backend_model>
+                </field>
+            </group>
+            <!-- Ported from Centraliza_Sales (centraliza/abandoned_cart/*, centraliza/cart_redirect/*). -->
+            <group id="abandoned_cart" translate="label comment" type="text" sortOrder="40"
+                   showInDefault="1" showInWebsite="1" showInStore="0">
+                <label>Abandoned Cart</label>
+                <comment>Reminders of the carts logged-in customers left behind (cart.abandoned), for Centraliza's WhatsApp recovery automations. They use the connection above, of the website that reports. Nothing is sent while Centraliza_Sales is enabled.</comment>
+                <field id="enabled" translate="label" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Enabled</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="abandon_minutes" translate="label comment" type="text" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Cart Abandonment Time (minutes)</label>
+                    <comment>How long the customer must stay inactive before the message. Changing the cart, opening the cart or the checkout page and logging in all count as activity and restart this wait; browsing the catalogue does not. E.g. 60 = one hour after the last activity; 0 = next run, for tests.</comment>
+                    <validate>required-entry validate-digits</validate>
+                    <backend_model>Centraliza\Connector\Messaging\Model\Config\Backend\AbandonedCart\AbandonMinutes</backend_model>
+                </field>
+                <field id="send_limit_minutes" translate="label comment" type="text" sortOrder="22"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Skip Carts Idle for More Than (minutes)</label>
+                    <comment>A cart with no activity for longer than this gets no message, so the customer is not reminded of something old. Counted from the last activity, not from the last change: a cart the customer opened today is not idle, however old its contents are. E.g. 1440 = 24 hours; 0 = no limit (up to 30 days, when Magento deletes the cart).</comment>
+                    <validate>required-entry validate-digits validate-digits-range digits-range-0-10080</validate>
+                    <backend_model>Centraliza\Connector\Messaging\Model\Config\Backend\AbandonedCart\SendLimitMinutes</backend_model>
+                </field>
+                <field id="max_notifications" translate="label comment" type="text" sortOrder="24"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Total Notifications per Cart</label>
+                    <comment>How many messages the same cart can generate, the first included. A new one goes out when the customer comes back after the last message — changing an item or just opening the cart or the checkout again — and then stays away for the abandonment time. E.g. 3 = the first and up to 2 resends; 1 = only one; 0 = no limit, so a customer who keeps coming back keeps being reminded.</comment>
+                    <validate>required-entry validate-digits</validate>
+                    <backend_model>Centraliza\Connector\Messaging\Model\Config\Backend\AbandonedCart\MaxNotifications</backend_model>
+                </field>
+            </group>
+            <group id="cart_redirect" translate="label comment" type="text" sortOrder="50"
+                   showInDefault="1" showInWebsite="1" showInStore="0">
+                <label>Cart Recovery Link</label>
+                <comment>While Centraliza_Sales is enabled, the link is answered by the legacy module with its own setting.</comment>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Enabled</label>
+                    <comment>Accepts the /centraliza/cart_redirect/?cart_id= link generated by Centraliza and opens the cart Centraliza created as the customer's cart.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+            </group>
         </section>
     </system>
 </config>

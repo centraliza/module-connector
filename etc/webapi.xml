@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Webapi:etc/webapi.xsd">
+    <!--
+        Delivery callback of the order notifications, the URL registered in Centraliza; everything travels in the
+        POST body. Centraliza_Sales declares the same route while it is installed: the declarations merge into one,
+        and both services update the same row of centraliza_notification the same way.
+    -->
+    <route url="/V1/centraliza/notification/sent" method="POST">
+        <service class="Centraliza\Connector\Messaging\Api\NotificationDeliveryManagementInterface" method="markSent"/>
+        <resources>
+            <resource ref="Centraliza_Notification::delivery_callback"/>
+        </resources>
+    </route>
+</routes>

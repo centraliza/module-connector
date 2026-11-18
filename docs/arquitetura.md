@@ -372,9 +372,9 @@ São os eventos da mesma rota que levam `contact` e `data` completo, validados p
 
 | Tipo | O que faz no Centraliza (segundo a documentação) | Nos módulos atuais | Neste módulo |
 |---|---|---|---|
-| `order.status_updated` | notifica o cliente da mudança de status | existe | portar |
-| `order.created` | encerra fluxos de carrinho abandonado do mesmo carrinho (`data.cart.id` ou `data.order.cart_id`, telefone ou e-mail) | existe, desligado por padrão | portar e ligar |
-| `cart.abandoned` | inicia a recuperação de carrinho | existe | portar |
+| `order.status_updated` | notifica o cliente da mudança de status | existe | portado (fase 2) |
+| `order.created` | encerra fluxos de carrinho abandonado do mesmo carrinho (`data.cart.id` ou `data.order.cart_id`, telefone ou e-mail) | existe, desligado por padrão | portado (fase 2), desligado por padrão; só sai para pedido de carrinho aberto pelo link (fase 3) |
+| `cart.abandoned` | inicia a recuperação de carrinho | existe | portado (fase 3) |
 | `cart.recovered` | encerra fluxos de carrinho abandonado do mesmo carrinho | não existe | novo |
 | `order.shipped` | não descrito | não existe | novo, a confirmar |
 | `contact.created`, `contact.updated` | não descrito | não existe | a decidir (ver seção 10) |
@@ -458,6 +458,9 @@ Configuração em Stores > Configuration > Services > Centraliza Connector. Todo
 | `centraliza_connector/connection/{key_hash,workspace_name,validated_at}_{production,staging}` | gravado pelo botão Autenticar (só no escopo de website): estado da validação da chave do website em cada ambiente; as mensagens só saem com a chave validada |
 | `centraliza_connector/connection/rejected_keys` | só no Default Config: chaves que a Centraliza recusou, por hash |
 | `centraliza_connector/general/base_url_{production,staging}` | sem campo no admin: `https://api.centraliza.ai` e `https://api.centraliza.dev` |
+| `centraliza_connector/abandoned_cart/{enabled,abandon_minutes,send_limit_minutes,max_notifications}` | carrinho abandonado (WhatsApp), portado do `Centraliza_Sales`: liga, tempo de abandono (60 min), limite de carrinho parado (1440 min) e total de mensagens por carrinho (1) |
+| `centraliza_connector/cart_redirect/enabled` | aceita o link de recuperação `/centraliza/cart_redirect/?cart_id=`; desligado, o link responde 404. Não depende da chave |
+| `centraliza_connector/order_notification/{enabled,order_created_enabled,notified_statuses,retry_enabled,give_up_hours,max_attempts}` | notificações de status de pedido (WhatsApp), portadas do `Centraliza_Sales`: liga, `order.created`, status notificados, reenvio automático, desistência (24 h) e tentativas (5, de 1 a 10) |
 
 Em modo `live` sem chave ou sem channel ID no ambiente do website, nada é enviado: o evento é retido como em um `401`, sem gastar tentativa. Trocar de ambiente não migra a fila: eventos ainda não entregues saem para o ambiente novo.
 
@@ -465,7 +468,7 @@ Em modo `live` sem chave ou sem channel ID no ambiente do website, nada é envia
 
 ### Migração dos módulos antigos
 
-Os módulos antigos (`Centraliza_Base`, `Centraliza_Notification`, `Centraliza_Sales`) continuam instalados e ativos: status de pedido por WhatsApp, carrinho abandonado, link de recuperação de carrinho e callback de entrega ainda vivem neles. Este módulo substitui as notificações de catálogo e está recebendo o resto por transplante, em fases ([legado.md](legado.md)). Enquanto `Centraliza_Sales` estiver habilitado, as mensagens daqui ficam paradas (`Messaging\Model\Config::isReady()`), então o corte é um deploy que desabilita os três no `config.php`.
+Os módulos antigos (`Centraliza_Base`, `Centraliza_Notification`, `Centraliza_Sales`) continuam instalados. Este módulo substitui as notificações de catálogo e está recebendo o resto por transplante, em fases ([legado.md](legado.md)): status de pedido por WhatsApp e callback de entrega (fase 2), carrinho abandonado e link de recuperação de carrinho (fase 3) já foram portados. Falta o corte (fase 4). Enquanto `Centraliza_Sales` estiver habilitado, as mensagens daqui ficam paradas (`Messaging\Model\Config::isReady()`), então o corte é um deploy que desabilita os três no `config.php`.
 
 Desde a fase 1 as tabelas e colunas dos antigos que as mensagens usam estão declaradas aqui também, então desabilitá-los só apaga as 7 tabelas do catálogo antigo. Antes disso, ponha os indexers do catálogo antigo em "Update on Save" (`bin/magento indexer:set-mode realtime centraliza_catalog_product centraliza_catalog_inventory centraliza_catalog_stock_links`), para os triggers deles saírem antes.
 
@@ -483,18 +486,21 @@ O comando importa um website: o que tem a integração antiga ligada com chave, 
 | chave da API | `centraliza/general/api_key` do website (criptografada) | `centraliza_connector/general/api_key_production` do website (recriptografada) |
 | website ligado | `centraliza/general/enabled` = 1 no website | `centraliza_connector/general/enabled` = 1 no website |
 | channel ID | não existe nos antigos | `--connection-id` → `connection_id_production` do website |
+| mensagens | `centraliza/order_notification/*`, `centraliza/abandoned_cart/*` e `centraliza/cart_redirect/enabled` como o website lê (com a herança do default) | os mesmos grupos em `centraliza_connector/*`, no website |
 | catálogo antigo (`--disable-legacy-catalog`) | `centraliza/notification/general/enabled` | `0` no escopo default e em todo escopo que tenha valor próprio |
 
 O comando nunca desliga um website no conector e não mexe no `mode` nem no `environment`. Rodar de novo não desfaz nada. Ele para se a integração antiga estiver ligada em mais de um website sem `--website`, ou se outro website já reportar no conector. A chave nunca é impressa, só um fingerprint `sha256:` de 8 caracteres.
 
 ## Telas do admin
 
-Menu **Centraliza** (ACL `Centraliza_Connector::centraliza_connector`, separada da configuração, para que dar acesso às telas não dê acesso à chave):
+Menu **Centraliza** (ACL `Centraliza_Base::menu`, o id dos antigos; separada da configuração, para que dar acesso às telas não dê acesso à chave):
 
 | Tela | Rota | ACL | O que mostra |
 |---|---|---|---|
 | Painel | `centraliza_connector/dashboard/index` | `::manage` | website que reporta, ambiente, modo, chave verificada, channel ID, limite, circuit breaker, fila por lane, retry, quarentena (com botão "Enviar de novo") e resultados das últimas 24 h; um botão por entidade para enviar todos os registros; os envios recentes |
 | Requisições enviadas | `centraliza_connector/delivery/index` | `::deliveries` | grade de `centraliza_connector_delivery_log`: quando, entidade, verbo, chave do registro, resposta, HTTP, o que foi feito depois, tentativa, detalhe, modo, ambiente, duração e atraso desde a mudança |
+| Carrinhos abandonados | `centraliza_connector/abandonedcart/index` | `Centraliza_Sales::abandoned_cart` (enviar agora: `::abandoned_cart_send_now`) | grade de `centraliza_sales_abandoned_cart`, portada do `Centraliza_Sales`: carrinho, número da mensagem, website, situação, última alteração, cliente parado desde, datas e tentativas; "Enviar agora" |
+| Notificações de pedido | `centraliza_connector/ordernotification/index` | `Centraliza_Notification::notification_log` (reenviar: `::notification_resend`; enviar agora: `::notification_send_now`) | grade de `centraliza_notification`, portada do `Centraliza_Sales`: pedido, evento, website, status notificado, situação, tentativas, último erro, id na Centraliza e datas; reenvio em massa com travas (até 500) e "Enviar agora"; sem exportação |
 
 **Registro de envios.** `DeliverEvent` grava uma linha por requisição feita (ou simulada, em `dry_run`) pela porta `Core\Port\DeliveryLogInterface`. Evento retido sem requisição (sem chave, sem cota: `Outcome::held()`) e registro que sumiu não geram linha. Guarda a chave do registro, não o registro, que é lido de novo a cada tentativa e pode ter dado pessoal. A grade não exporta CSV (a chave de cliente leva o e-mail). O cron `centraliza_connector_clean_delivery_log` (03:40) apaga o que passou de 30 dias.
 

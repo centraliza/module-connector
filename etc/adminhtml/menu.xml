@@ -5,16 +5,23 @@
             The part of each id after "::" becomes the CSS class of the item (item-<part>), and the admin theme
             styles some of those classes: "dashboard" would get the icon of the admin Dashboard. Every id here
             starts with centraliza_ so none of them takes another item's style; item-centraliza-connector carries
-            the icon of this menu (view/adminhtml/web/css/menu.css).
+            the icon of this menu (view/adminhtml/web/css/menu.css). The legacy modules use other ids, so while
+            they are enabled their own Centraliza menu shows next to this one.
         -->
         <add id="Centraliza_Connector::centraliza_connector" title="Centraliza" translate="title"
-             module="Centraliza_Connector" sortOrder="81" resource="Centraliza_Connector::centraliza_connector"/>
+             module="Centraliza_Connector" sortOrder="81" resource="Centraliza_Base::menu"/>
         <add id="Centraliza_Connector::centraliza_dashboard" title="Dashboard" translate="title" module="Centraliza_Connector"
              sortOrder="10" parent="Centraliza_Connector::centraliza_connector"
              action="centraliza_connector/dashboard/index" resource="Centraliza_Connector::manage"/>
         <add id="Centraliza_Connector::centraliza_deliveries" title="Sent Requests" translate="title" module="Centraliza_Connector"
              sortOrder="20" parent="Centraliza_Connector::centraliza_connector"
              action="centraliza_connector/delivery/index" resource="Centraliza_Connector::deliveries"/>
+        <add id="Centraliza_Connector::centraliza_notifications" title="Order Notifications" translate="title" module="Centraliza_Connector"
+             sortOrder="25" parent="Centraliza_Connector::centraliza_connector"
+             action="centraliza_connector/ordernotification/index" resource="Centraliza_Notification::notification_log"/>
+        <add id="Centraliza_Connector::centraliza_abandoned_carts" title="Abandoned Carts" translate="title" module="Centraliza_Connector"
+             sortOrder="27" parent="Centraliza_Connector::centraliza_connector"
+             action="centraliza_connector/abandonedcart/index" resource="Centraliza_Sales::abandoned_cart"/>
         <add id="Centraliza_Connector::centraliza_configuration" title="Configuration" translate="title" module="Centraliza_Connector"
              sortOrder="30" parent="Centraliza_Connector::centraliza_connector"
              action="adminhtml/system_config/edit/section/centraliza_connector" resource="Centraliza_Connector::config"/>

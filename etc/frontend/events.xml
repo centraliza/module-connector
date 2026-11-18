@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <!-- Ported from Centraliza_Sales, under other observer names (the same name would replace the legacy observer).
+         Each one does nothing while Centraliza_Sales is enabled. -->
+    <event name="controller_action_predispatch_checkout_cart_index">
+        <observer name="centraliza_connector_record_cart_activity" instance="Centraliza\Connector\Messaging\Observer\RecordCartActivity"/>
+    </event>
+    <event name="controller_action_predispatch_checkout_index_index">
+        <observer name="centraliza_connector_record_cart_activity" instance="Centraliza\Connector\Messaging\Observer\RecordCartActivity"/>
+    </event>
+    <event name="load_customer_quote_before">
+        <observer name="centraliza_connector_replace_customer_cart_on_login" instance="Centraliza\Connector\Messaging\Observer\ReplaceCustomerCartOnLogin"/>
+    </event>
+</config>

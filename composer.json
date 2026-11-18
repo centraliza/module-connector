@@ -21,6 +21,10 @@
         "magento/module-config": "*",
         "magento/module-backend": "*",
         "magento/module-ui": "*",
+        "magento/module-webapi": "*",
+        "magento/module-authorization": "*",
+        "magento/module-checkout": "*",
+        "magento/module-configurable-product": "*",
         "guzzlehttp/guzzle": "^7.4",
         "giggsey/libphonenumber-for-php": "^9.0"
     },

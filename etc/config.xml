@@ -23,6 +23,24 @@
                 <request_limit>60</request_limit>
                 <bulk_quota_floor>30</bulk_quota_floor>
             </delivery>
+            <order_notification>
+                <enabled>0</enabled>
+                <!-- Off until Centraliza confirms the order.created event and the cart on status events: a 4xx on a
+                     status event fails it for good, so a deploy must not turn them on by itself. -->
+                <order_created_enabled>0</order_created_enabled>
+                <retry_enabled>1</retry_enabled>
+                <give_up_hours>24</give_up_hours>
+                <max_attempts>5</max_attempts>
+            </order_notification>
+            <abandoned_cart>
+                <enabled>0</enabled>
+                <abandon_minutes>60</abandon_minutes>
+                <send_limit_minutes>1440</send_limit_minutes>
+                <max_notifications>1</max_notifications>
+            </abandoned_cart>
+            <cart_redirect>
+                <enabled>0</enabled>
+            </cart_redirect>
         </centraliza_connector>
     </default>
 </config>

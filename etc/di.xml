@@ -40,11 +40,13 @@
         </arguments>
     </type>
 
-    <!-- "Sent requests" grid. -->
+    <!-- "Sent requests" and "Order Notifications" grids. -->
     <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
         <arguments>
             <argument name="collections" xsi:type="array">
                 <item name="centraliza_connector_delivery_listing_data_source" xsi:type="string">CentralizaConnectorDeliveryLogGridCollection</item>
+                <item name="centraliza_connector_notification_listing_data_source" xsi:type="string">CentralizaConnectorNotificationListingSearchResult</item>
+                <item name="centraliza_connector_abandoned_cart_listing_data_source" xsi:type="string">CentralizaConnectorAbandonedCartListingSearchResult</item>
             </argument>
         </arguments>
     </type>
@@ -241,6 +243,167 @@
     <!-- Connection events take the bulk share of the key's quota. -->
     <type name="Centraliza\Connector\Infra\Http\SharedQuota">
         <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+
+    <!-- Order notifications, ported from Centraliza_Sales. -->
+    <preference for="Centraliza\Connector\Messaging\Api\OrderNotificationConfigInterface" type="Centraliza\Connector\Messaging\Model\OrderNotification\Config"/>
+    <preference for="Centraliza\Connector\Messaging\Api\NotificationDeliveryManagementInterface" type="Centraliza\Connector\Messaging\Model\OrderNotification\NotificationDeliveryManagement"/>
+    <preference for="Centraliza\Connector\Messaging\Api\SendNotificationServiceInterface" type="Centraliza\Connector\Messaging\Service\OrderNotification\SendNotificationService"/>
+    <preference for="Centraliza\Connector\Messaging\Api\QueueOrderNotificationServiceInterface" type="Centraliza\Connector\Messaging\Service\OrderNotification\QueueOrderNotificationService"/>
+    <preference for="Centraliza\Connector\Messaging\Api\OrderPayloadBuilderInterface" type="Centraliza\Connector\Messaging\Model\OrderNotification\Payload\OrderPayloadBuilder"/>
+    <preference for="Centraliza\Connector\Messaging\Api\OrderCreatedPayloadBuilderInterface" type="Centraliza\Connector\Messaging\Model\OrderNotification\Payload\OrderCreatedPayloadBuilder"/>
+    <preference for="Centraliza\Connector\Messaging\Api\ResendNotificationServiceInterface" type="Centraliza\Connector\Messaging\Service\OrderNotification\ResendNotificationService"/>
+    <virtualType name="CentralizaConnectorNotificationListingSearchResult" type="Magento\Framework\View\Element\UiComponent\DataProvider\SearchResult">
+        <arguments>
+            <argument name="mainTable" xsi:type="string">centraliza_notification</argument>
+            <argument name="resourceModel" xsi:type="string">Centraliza\Connector\Messaging\Model\ResourceModel\OrderNotification\Notification</argument>
+        </arguments>
+    </virtualType>
+    <type name="Centraliza\Connector\Messaging\Model\ResourceModel\DatabaseClock">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Observer\PublishOrderStatusChange">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Cron\OrderNotification\SendNotifications">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Controller\Adminhtml\OrderNotification\MassResend">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Controller\Adminhtml\OrderNotification\SendNow">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\OrderNotification\NotificationDeliveryManagement">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+            <argument name="debugLogger" xsi:type="object">CentralizaConnectorDebugLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\OrderNotification\Payload\OrderPayloadBuilder">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+            <!-- The storefront builder: in the admin area (Send now) UrlInterface would give an admin link. -->
+            <argument name="urlBuilder" xsi:type="object">Magento\Framework\Url</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Service\OrderNotification\SendNotificationService">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+            <argument name="debugLogger" xsi:type="object">CentralizaConnectorDebugLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Service\OrderNotification\QueueOrderNotificationService">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\OrderNotification\Config">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+
+    <!-- Abandoned carts and the cart recovery link, ported from Centraliza_Sales. -->
+    <preference for="Centraliza\Connector\Messaging\Api\AbandonedCartConfigInterface" type="Centraliza\Connector\Messaging\Model\AbandonedCart\Config"/>
+    <preference for="Centraliza\Connector\Messaging\Api\Data\AbandonedCartInterface" type="Centraliza\Connector\Messaging\Model\AbandonedCart\AbandonedCart"/>
+    <preference for="Centraliza\Connector\Messaging\Api\AbandonedCartRepositoryInterface" type="Centraliza\Connector\Messaging\Model\AbandonedCart\AbandonedCartRepository"/>
+    <preference for="Centraliza\Connector\Messaging\Api\AbandonedCartPayloadBuilderInterface" type="Centraliza\Connector\Messaging\Model\AbandonedCart\Payload\PayloadBuilder"/>
+    <preference for="Centraliza\Connector\Messaging\Api\SelectAbandonedCartsServiceInterface" type="Centraliza\Connector\Messaging\Service\AbandonedCart\SelectAbandonedCartsService"/>
+    <preference for="Centraliza\Connector\Messaging\Api\SendAbandonedCartsServiceInterface" type="Centraliza\Connector\Messaging\Service\AbandonedCart\SendAbandonedCartsService"/>
+    <preference for="Centraliza\Connector\Messaging\Api\CartRedirectConfigInterface" type="Centraliza\Connector\Messaging\Model\CartRedirect\Config"/>
+    <preference for="Centraliza\Connector\Messaging\Api\ReplaceCartServiceInterface" type="Centraliza\Connector\Messaging\Service\CartRedirect\ReplaceCartService"/>
+    <virtualType name="CentralizaConnectorAbandonedCartListingSearchResult" type="Magento\Framework\View\Element\UiComponent\DataProvider\SearchResult">
+        <arguments>
+            <argument name="mainTable" xsi:type="string">centraliza_sales_abandoned_cart</argument>
+            <argument name="resourceModel" xsi:type="string">Centraliza\Connector\Messaging\Model\ResourceModel\AbandonedCart</argument>
+        </arguments>
+    </virtualType>
+    <type name="Centraliza\Connector\Messaging\Model\AbandonedCart\AbandonedCartRepository">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\AbandonedCart\AbandonmentPeriod">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\AbandonedCart\Payload\PayloadBuilder">
+        <arguments>
+            <argument name="debugLogger" xsi:type="object">CentralizaConnectorDebugLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Service\AbandonedCart\SelectAbandonedCartsService">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+            <argument name="debugLogger" xsi:type="object">CentralizaConnectorDebugLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Model\AbandonedCart\CartSender">
+        <arguments>
+            <!-- Marketing priority, so order notifications keep the key's last requests. -->
+            <argument name="client" xsi:type="object">CentralizaConnectorMarketingClient</argument>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Service\AbandonedCart\SendAbandonedCartsService">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Cron\AbandonedCart\ProcessAbandonedCarts">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+            <argument name="debugLogger" xsi:type="object">CentralizaConnectorDebugLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Controller\Adminhtml\AbandonedCart\SendNow">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Service\CartRedirect\ReplaceCartService">
+        <arguments>
+            <!-- Session proxies: the sessions start only when the cart redirect actually reads them. -->
+            <argument name="checkoutSession" xsi:type="object">Magento\Checkout\Model\Session\Proxy</argument>
+            <argument name="customerSession" xsi:type="object">Magento\Customer\Model\Session\Proxy</argument>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Observer\RecordCartActivity">
+        <arguments>
+            <argument name="checkoutSession" xsi:type="object">Magento\Checkout\Model\Session\Proxy</argument>
+            <argument name="customerSession" xsi:type="object">Magento\Customer\Model\Session\Proxy</argument>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Observer\CarryCartLinkOnMerge">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Messaging\Observer\ReplaceCustomerCartOnLogin">
+        <arguments>
+            <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
+        </arguments>
+    </type>
+    <type name="Centraliza\Connector\Controller\Cart\Redirect\Index">
+        <arguments>
+            <argument name="customerSession" xsi:type="object">Magento\Customer\Model\Session\Proxy</argument>
+            <argument name="checkoutSession" xsi:type="object">Magento\Checkout\Model\Session\Proxy</argument>
             <argument name="logger" xsi:type="object">CentralizaConnectorSafeLogger</argument>
         </arguments>
     </type>

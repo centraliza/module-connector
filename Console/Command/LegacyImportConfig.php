@@ -22,10 +22,11 @@ use Throwable;
 
 /**
  * Copies the connection of the legacy Centraliza modules (Centraliza_Base and friends) to one website of this
- * module: the API key, into the production slot (the legacy modules only talk to production), and the website's
- * switch when the legacy integration was on there. Everything is written at that website's scope: this module
- * reports one website at a time. Optionally turns off the legacy catalog notifications, which this module
- * replaces.
+ * module: the API key, into the production slot (the legacy modules only talk to production), the website's
+ * switch when the legacy integration was on there, and the settings of the messages (order notifications, abandoned
+ * carts, cart recovery link) as the website reads them.
+ * Everything is written at that website's scope: this module reports one website at a time. Optionally turns off
+ * the legacy catalog notifications, which this module replaces.
  */
 class LegacyImportConfig extends Command
 {
@@ -40,6 +41,21 @@ class LegacyImportConfig extends Command
     /** Legacy catalog notifications (product, price, inventory): replaced by this module's streams. */
     private const LEGACY_CATALOG_SWITCHES = [
         'centraliza/notification/general/enabled',
+    ];
+
+    /** Order notifications, abandoned carts and the cart recovery link (Centraliza_Sales), legacy path => path here. */
+    private const MESSAGING_PATHS = [
+        'centraliza/order_notification/enabled' => 'centraliza_connector/order_notification/enabled',
+        'centraliza/order_notification/order_created_enabled' => 'centraliza_connector/order_notification/order_created_enabled',
+        'centraliza/order_notification/notified_statuses' => 'centraliza_connector/order_notification/notified_statuses',
+        'centraliza/order_notification/retry_enabled' => 'centraliza_connector/order_notification/retry_enabled',
+        'centraliza/order_notification/give_up_hours' => 'centraliza_connector/order_notification/give_up_hours',
+        'centraliza/order_notification/max_attempts' => 'centraliza_connector/order_notification/max_attempts',
+        'centraliza/abandoned_cart/enabled' => 'centraliza_connector/abandoned_cart/enabled',
+        'centraliza/abandoned_cart/abandon_minutes' => 'centraliza_connector/abandoned_cart/abandon_minutes',
+        'centraliza/abandoned_cart/send_limit_minutes' => 'centraliza_connector/abandoned_cart/send_limit_minutes',
+        'centraliza/abandoned_cart/max_notifications' => 'centraliza_connector/abandoned_cart/max_notifications',
+        'centraliza/cart_redirect/enabled' => 'centraliza_connector/cart_redirect/enabled',
     ];
 
     private const API_KEY = 'centraliza_connector/general/api_key_production';
@@ -61,7 +77,7 @@ class LegacyImportConfig extends Command
     protected function configure(): void
     {
         $this->setName('centraliza:legacy:import-config')
-            ->setDescription('Copies the API key of the legacy Centraliza modules to one website of Centraliza Connector (production)')
+            ->setDescription('Copies the API key and message settings of the legacy Centraliza modules to one website of Centraliza Connector (production)')
             ->addOption(
                 self::OPTION_CONNECTION_ID,
                 null,
@@ -149,6 +165,13 @@ class LegacyImportConfig extends Command
         }
         if ($connectionId !== '') {
             $writes[] = [self::CONNECTION_ID, $connectionId, ScopeInterface::SCOPE_WEBSITES, $target];
+        }
+        // As the website reads them, so a value the legacy website inherited from Default Config comes along too.
+        foreach (self::MESSAGING_PATHS as $legacyPath => $path) {
+            $value = $this->scopeConfig->getValue($legacyPath, ScopeInterface::SCOPE_WEBSITE, $target);
+            if ($value !== null && $value !== '') {
+                $writes[] = [$path, (string)$value, ScopeInterface::SCOPE_WEBSITES, $target];
+            }
         }
         if ($input->getOption(self::OPTION_DISABLE_LEGACY_CATALOG)) {
             foreach ($this->legacyCatalogScopes() as [$path, $scope, $scopeId]) {
