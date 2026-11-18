@@ -108,6 +108,19 @@ class Dashboard extends Template
         return $this->queueDepth->byLane();
     }
 
+    /**
+     * @return int|null minutes the oldest message on the queue has waited; null with nothing waiting or RabbitMQ
+     */
+    public function getOldestWaitingMinutes(): ?int
+    {
+        $oldest = null;
+        foreach ($this->queueDepth->lanes() ?? [] as $lane) {
+            $oldest = max($oldest ?? 0, $lane['oldest_seconds']);
+        }
+
+        return $oldest === null ? null : intdiv($oldest, 60);
+    }
+
     public function getHeld(): int
     {
         return $this->retryStore->summary()['count'];
@@ -214,6 +227,11 @@ class Dashboard extends Template
     public function getDeliveriesUrl(): string
     {
         return $this->getUrl('centraliza_connector/delivery/index');
+    }
+
+    public function getPendingUrl(): string
+    {
+        return $this->getUrl('centraliza_connector/pending/index');
     }
 
     public function getConfigUrl(): string

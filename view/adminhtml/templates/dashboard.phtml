@@ -31,6 +31,7 @@ $formKey = $block->getFormKey();
 </style>
 <div class="centraliza-dashboard">
     <p class="centraliza-links">
+        <a href="<?= $escaper->escapeUrl($block->getPendingUrl()) ?>"><?= $escaper->escapeHtml(__('See the pending events')) ?></a>
         <a href="<?= $escaper->escapeUrl($block->getDeliveriesUrl()) ?>"><?= $escaper->escapeHtml(__('See the sent requests')) ?></a>
         <a href="<?= $escaper->escapeUrl($block->getConfigUrl()) ?>"><?= $escaper->escapeHtml(__('Configuration')) ?></a>
     </p>
@@ -90,6 +91,11 @@ $formKey = $block->getFormKey();
                         <?= $escaper->escapeHtml(__('See RabbitMQ')) ?>
                     <?php else: ?>
                         <?= $escaper->escapeHtml(__('%1 real time · %2 bulk', $queue['realtime'] ?? 0, $queue['bulk'] ?? 0)) ?>
+                        <?php $oldestMinutes = $block->getOldestWaitingMinutes(); ?>
+                        <?php if ($oldestMinutes !== null): ?>
+                            <br/><span style="font-size: 1.2rem; font-weight: normal;"><?= $escaper->escapeHtml(__('oldest waiting for %1 min', $oldestMinutes)) ?>
+                            · <a href="<?= $escaper->escapeUrl($block->getPendingUrl()) ?>"><?= $escaper->escapeHtml(__('see them')) ?></a></span>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </dd>
             </div>

@@ -40,11 +40,12 @@
         </arguments>
     </type>
 
-    <!-- "Sent requests" and "Order Notifications" grids. -->
+    <!-- "Sent requests", "Pending events", "Order Notifications" and "Abandoned Carts" grids. -->
     <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
         <arguments>
             <argument name="collections" xsi:type="array">
                 <item name="centraliza_connector_delivery_listing_data_source" xsi:type="string">CentralizaConnectorDeliveryLogGridCollection</item>
+                <item name="centraliza_connector_pending_listing_data_source" xsi:type="string">Centraliza\Connector\Infra\Persistence\PendingEventsGrid</item>
                 <item name="centraliza_connector_notification_listing_data_source" xsi:type="string">CentralizaConnectorNotificationListingSearchResult</item>
                 <item name="centraliza_connector_abandoned_cart_listing_data_source" xsi:type="string">CentralizaConnectorAbandonedCartListingSearchResult</item>
             </argument>

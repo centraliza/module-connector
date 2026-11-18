@@ -1,0 +1,29 @@
+<?php
+/**
+ * @var \Centraliza\Connector\Block\Adminhtml\QueueNotice $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+declare(strict_types=1);
+?>
+<?php foreach ($block->getStalledLanes() as $lane): ?>
+    <div class="message message-error error">
+        <div>
+            <?= $escaper->escapeHtml(__(
+                'The %1 queue is not moving: %2 event(s) have waited for %3 min and none was processed in the last %4 min. Check that the consumer %5 is running (supervisor, or the Magento cron with cron_consumers_runner).',
+                $lane['label'],
+                $lane['waiting'],
+                $lane['minutes'],
+                $block->getStalledAfterMinutes(),
+                $lane['consumer']
+            )) ?>
+        </div>
+    </div>
+<?php endforeach; ?>
+<?php if ($block->showBrokerNote()): ?>
+    <div class="message message-notice notice">
+        <div>
+            <?= $escaper->escapeHtml(__('The queue runs on RabbitMQ: events still on the queue are in the broker and only show here once they wait for a new attempt or go to quarantine.')) ?>
+        </div>
+    </div>
+<?php endif; ?>

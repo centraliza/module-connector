@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="content">
+            <block class="Centraliza\Connector\Block\Adminhtml\QueueNotice" name="centraliza_connector_queue_notice"
+                   template="Centraliza_Connector::queue-notice.phtml">
+                <arguments>
+                    <argument name="show_broker_note" xsi:type="boolean">true</argument>
+                </arguments>
+            </block>
+            <uiComponent name="centraliza_connector_pending_listing"/>
+        </referenceContainer>
+    </body>
+</page>

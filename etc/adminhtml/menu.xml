@@ -13,6 +13,9 @@
         <add id="Centraliza_Connector::centraliza_dashboard" title="Dashboard" translate="title" module="Centraliza_Connector"
              sortOrder="10" parent="Centraliza_Connector::centraliza_connector"
              action="centraliza_connector/dashboard/index" resource="Centraliza_Connector::manage"/>
+        <add id="Centraliza_Connector::centraliza_pending" title="Pending Events" translate="title" module="Centraliza_Connector"
+             sortOrder="15" parent="Centraliza_Connector::centraliza_connector"
+             action="centraliza_connector/pending/index" resource="Centraliza_Connector::deliveries"/>
         <add id="Centraliza_Connector::centraliza_deliveries" title="Sent Requests" translate="title" module="Centraliza_Connector"
              sortOrder="20" parent="Centraliza_Connector::centraliza_connector"
              action="centraliza_connector/delivery/index" resource="Centraliza_Connector::deliveries"/>

@@ -12,7 +12,7 @@ use Throwable;
 
 class QuarantineStore implements QuarantineStoreInterface
 {
-    private const TABLE = 'centraliza_connector_quarantine';
+    public const TABLE = 'centraliza_connector_quarantine';
     private const MAX_REASON_LENGTH = 255;
 
     public function __construct(

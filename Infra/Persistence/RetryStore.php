@@ -13,7 +13,7 @@ use Throwable;
 
 class RetryStore implements RetryStoreInterface
 {
-    private const TABLE = 'centraliza_connector_retry';
+    public const TABLE = 'centraliza_connector_retry';
     private const MAX_ERROR_LENGTH = 255;
 
     public function __construct(
